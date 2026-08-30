@@ -63,7 +63,8 @@ A simulated 27B tokenizer is not the generate path.
 npm i
 cp .env.example .env.local    # optional; empty keys → demo wallet
 npm test
-npm run dev
+npm run build && npm start    # preview on :43177 (preferred)
+# npm run dev                 # turbopack; can 403 JS chunks in some agents/VMs
 ```
 
 Then open [http://127.0.0.1:43177](http://127.0.0.1:43177).
