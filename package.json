@@ -7,12 +7,12 @@
   "description": "Building-scale mesh inference. Join a group, optionally share compute, unlock models from pooled VRAM, pay contributors per token.",
   "repository": {
     "type": "git",
-    "url": "https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e.git"
+    "url": "https://github.com/Hewlbern/hive.git"
   },
   "bugs": {
-    "url": "https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e"
+    "url": "https://github.com/Hewlbern/hive/issues"
   },
-  "homepage": "https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e",
+  "homepage": "https://github.com/Hewlbern/hive",
   "scripts": {
     "dev": "next dev -p 43177 --hostname 0.0.0.0",
     "build": "next build",

@@ -168,25 +168,12 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md). PRs that keep the join-then-unlock loo
 
 Hive Nano uses the `stories260K` / `tok512` export from [karpathy/tinyllamas](https://huggingface.co/karpathy/tinyllamas) (llama2.c). Qwen checkpoints are loaded at runtime via MLC WebLLM when selected. See [NOTICE](./NOTICE).
 
-## Make this repository public
+## Public repository
 
-This Origin repo was created **private**. The `origin` CLI in this environment cannot flip visibility.
+**GitHub (public):** https://github.com/Hewlbern/hive  
 
-**Repo:** https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e  
-**Clone:** `https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e.git`
+```bash
+git clone https://github.com/Hewlbern/hive.git
+```
 
-**Origin (Cursor) click-path**
-
-1. Open the repo URL above while logged in as the owner (Mike Holborn).
-2. Open **Settings** (gear) on the repository.
-3. Find **Visibility** / **Danger zone**.
-4. Change visibility from **Private** to **Public**.
-5. Confirm.
-
-If you publish a GitHub copy from the Cursor **Create repo** control:
-
-1. GitHub → the new repo → **Settings**.
-2. Scroll to **Danger Zone**.
-3. **Change repository visibility** → **Public** → confirm.
-
-Until that switch is flipped, other people cannot star or clone it.
+MIT licensed. Anyone can clone without auth.
