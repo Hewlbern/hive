@@ -138,7 +138,7 @@ Unit / functional (always run in CI and on this VM):
 - Out-of-credits refuse / mid-stream pause
 - Real Nano forward pass on the vendored checkpoint
 
-Playwright E2E: two Chromium contexts join `HIVE`, one shares, one prompts, both see tokens, balances move. If WebGPU is missing, the CPU hive-kernel still generates.
+Playwright E2E: two Chromium contexts join `HIVE`, one shares, the buyer selects **Hive Nano** (vendored weights), prompts, both see token text, balances and earnings move. Hive 15 / WebLLM paths need network + WebGPU — run those manually locally. On this VM, `npm test` runs vitest + Playwright against `next start` on port **43188**.
 
 UI references (MoonPay-grade restyle):
 

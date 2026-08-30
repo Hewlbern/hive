@@ -24,7 +24,7 @@ function empty(): PersistedState {
 
 function load(): PersistedState {
   try {
-    const raw = readFileSync(DATA_PATH, "utf8");
+    const raw = readFileSync(/* turbopackIgnore: true */ DATA_PATH, "utf8");
     const parsed = JSON.parse(raw) as PersistedState;
     if (!parsed.pools.HIVE) parsed.pools.HIVE = HIVE_POOL_STARTER;
     return parsed;
@@ -37,8 +37,8 @@ let state = load();
 
 function persist() {
   try {
-    mkdirSync(dirname(DATA_PATH), { recursive: true });
-    writeFileSync(DATA_PATH, JSON.stringify(state, null, 2));
+    mkdirSync(/* turbopackIgnore: true */ dirname(DATA_PATH), { recursive: true });
+    writeFileSync(/* turbopackIgnore: true */ DATA_PATH, JSON.stringify(state, null, 2));
   } catch (err) {
     console.warn("[hive] ledger persist failed", err);
   }
