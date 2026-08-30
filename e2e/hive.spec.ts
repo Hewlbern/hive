@@ -30,6 +30,11 @@ test("two browsers: share unlocks catalog, prompt streams to both, balances move
   await expect(worker.getByTestId("model-hive-nano")).toHaveAttribute("data-unlocked", "true", { timeout: 15_000 });
   await expect(buyer.getByTestId("model-hive-nano")).toHaveAttribute("data-unlocked", "true", { timeout: 15_000 });
 
+  // Use the vendored Nano checkpoint — Hive 15 downloads from the network and
+  // is too slow / flaky for CI. Assert on body text, not the "Swarm · …" label.
+  await buyer.getByTestId("model-hive-nano").click();
+  await expect(buyer.getByTestId("model-hive-nano")).toContainText(/selected/i, { timeout: 10_000 });
+
   const workerBalance = await worker.getByTestId("balance").innerText();
   const buyerBalance = await buyer.getByTestId("balance").innerText();
 
@@ -38,31 +43,23 @@ test("two browsers: share unlocks catalog, prompt streams to both, balances move
 
   await expect(buyer.getByTestId("swarm-message")).toBeVisible({ timeout: 45_000 });
   await expect(worker.getByTestId("swarm-message")).toBeVisible({ timeout: 45_000 });
-  await expect.poll(async () => buyer.getByTestId("swarm-message").innerText(), { timeout: 45_000 }).toMatch(/\w{3,}/);
-  await expect.poll(async () => worker.getByTestId("swarm-message").innerText(), { timeout: 45_000 }).toMatch(/\w{3,}/);
+  await expect
+    .poll(async () => buyer.getByTestId("swarm-text").innerText(), { timeout: 60_000 })
+    .toMatch(/[A-Za-z]{3,}/);
+  await expect
+    .poll(async () => worker.getByTestId("swarm-text").innerText(), { timeout: 60_000 })
+    .toMatch(/[A-Za-z]{3,}/);
 
   await expect.poll(async () => buyer.getByTestId("balance").innerText()).not.toEqual(buyerBalance);
-  try {
-    await expect
-      .poll(async () => Number(await worker.getByTestId("earnings").getAttribute("data-earned")))
-      .toBeGreaterThan(0);
-  } catch (err) {
-    const dump = await worker.evaluate(() => ({
-      earnedText: document.querySelector("[data-testid=earnings]")?.textContent,
-      earnedAttr: document.querySelector("[data-testid=earnings]")?.getAttribute("data-earned"),
-      balance: document.querySelector("[data-testid=balance]")?.textContent,
-      connected: document.querySelector("[data-connected]")?.getAttribute("data-connected"),
-      swarm: document.querySelector("[data-testid=swarm-message]")?.textContent,
-    }));
-    const buyerDump = await buyer.evaluate(() => ({
-      balance: document.querySelector("[data-testid=balance]")?.textContent,
-      swarm: document.querySelector("[data-testid=swarm-message]")?.textContent,
-    }));
-    console.log("earnings dump", { dump, buyerDump, workerBalance, buyerBalance });
-    throw err;
-  }
+  await expect
+    .poll(async () => Number(await worker.getByTestId("earnings").getAttribute("data-earned")), {
+      timeout: 30_000,
+    })
+    .toBeGreaterThan(0);
 
-  void workerBalance;
+  // Worker wallet should also receive the layer split.
+  await expect.poll(async () => worker.getByTestId("balance").innerText()).not.toEqual(workerBalance);
+
   await workerCtx.close();
   await buyerCtx.close();
 });

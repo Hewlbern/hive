@@ -127,7 +127,11 @@ export function HiveRoom({ code }: { code: string }) {
                     {m.role === "you" ? m.authorName || "You" : m.role === "swarm" ? `Swarm · ${m.modelId}` : "Hive"}
                     {m.live ? " · live" : ""}
                   </p>
-                  <p className="mt-2 text-[22px] leading-snug font-medium whitespace-pre-wrap" data-role={m.role}>
+                  <p
+                    className="mt-2 text-[22px] leading-snug font-medium whitespace-pre-wrap"
+                    data-role={m.role}
+                    data-testid={m.role === "swarm" ? "swarm-text" : "user-text"}
+                  >
                     {m.text || (m.live ? "…" : "")}
                   </p>
                 </article>
