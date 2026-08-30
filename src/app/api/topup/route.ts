@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { normalizeSwarmId } from "@/lib/swarm-id";
 import { notifyWallets } from "@/server/hub";
 import {
   creditPool,
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
     target?: "wallet" | "pool";
   };
   const deviceId = body.deviceId;
-  const code = (body.code || "HIVE").toUpperCase();
+  const code = normalizeSwarmId(body.code || "HIVE");
   const pack = PACKS[body.pack || "5"];
   if (!deviceId || !pack) {
     return Response.json({ error: "deviceId and pack required" }, { status: 400 });

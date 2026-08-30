@@ -69,6 +69,83 @@ npm run build && npm start    # preview on :43177 (preferred)
 
 Then open [http://127.0.0.1:43177](http://127.0.0.1:43177).
 
+## Desktop app (Tauri 2 + Rust)
+
+We use **Tauri 2** (Rust core + system webview) instead of Electron so the desktop shell is actually written in Rust.
+
+```bash
+# needs Rust 1.98+ (see rust-toolchain.toml), system webview deps on Linux
+npm i
+npm run build && npm start          # terminal 1 — Hive web hub on :43177
+cargo tauri dev                     # terminal 2 — desktop window + tray
+# or: npm run desktop:dev
+```
+
+| OS | Notes |
+| --- | --- |
+| **macOS** | Xcode CLT. `cargo tauri dev` |
+| **Linux** | `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`, `patchelf` |
+| **Windows** | WebView2 runtime. Visual Studio C++ build tools. `cargo tauri dev` |
+
+The window loads the existing Hive UI (`HIVE_URL`, default `http://127.0.0.1:43177`). Tray: toggle share, open window, quit. Mesh/inference stays in the webview.
+
+```bash
+cargo test -p hive-core
+cargo test -p hive-discord
+# npm run test:rust   # both (excludes GUI crate)
+```
+
+## Discord bot — share compute in a server
+
+Same Rust workspace (`crates/hive-discord`, poise + serenity). A Discord **guild = a Hive swarm** with id `dc:<guild_id>`.
+
+### Create the bot (Discord Developer Portal)
+
+1. Open [discord.com/developers/applications](https://discord.com/developers/applications) → **New Application** → name it `Hive`.
+2. **Bot** → **Add Bot** → **Reset Token** → copy into `.env` as `DISCORD_BOT_TOKEN` (never commit it).
+3. Under **Privileged Gateway Intents**, you can leave Message Content off (slash commands only).
+4. **OAuth2 → URL Generator**: scopes `bot` + `applications.commands`. Bot permissions: **Send Messages**, **Use Slash Commands**.
+5. Copy the invite URL, open it, pick your server. Copy **Application ID** into `DISCORD_CLIENT_ID`.
+
+### Run the bot
+
+**Option A — inside the desktop app** (one host machine):
+
+```bash
+export DISCORD_BOT_TOKEN=...
+export HIVE_URL=http://127.0.0.1:43177
+cargo tauri dev
+```
+
+**Option B — always-on host:**
+
+```bash
+export DISCORD_BOT_TOKEN=...
+export HIVE_URL=http://127.0.0.1:43177
+cargo run -p hive-discord
+# or: npm run discord
+```
+
+### Slash commands
+
+| Command | What it does |
+| --- | --- |
+| `/hive` | Who’s sharing, pooled MB, unlocked / next model |
+| `/share code:XXXXXX` | Pair desktop ↔ Discord user, mark share ON for this guild |
+| `/unshare` | Stop contributing this machine |
+| `/ask prompt:` | Run a prompt on the guild swarm (needs sharers) |
+
+### 60-second walkthrough
+
+1. Start Hive web (`npm start`) + bot (`cargo run -p hive-discord` or desktop with token).
+2. Invite the bot; in Discord run `/hive` — catalog locked.
+3. On machine A: open desktop (or web), generate a pairing code via the Tauri `pairing_code` command / local API register, run `/share code:AAAAAA`.
+4. On machine B: same with another code → `/share`.
+5. `/hive` shows pooled MB and unlocked models.
+6. Anyone runs `/ask prompt: Once upon a time` → tokens land in the channel.
+
+Pairing codes are **consume-once**, TTL 10 minutes, stored in `~/.config/hive/pairing.json` and/or the hub (`/api/pairing/*`).
+
 ## How to join a group
 
 - **Start a building:** landing page → *Start a building swarm* (random four-letter code).
@@ -125,6 +202,7 @@ Join, watch, prompt, and get paid work. WebGPU is limited or missing; Hive treat
 npm test          # unit + functional + Playwright E2E
 npm run test:unit # vitest only
 npm run test:e2e  # Playwright against next start on :43188 (not turbopack)
+npm run test:rust # cargo test -p hive-core -p hive-discord
 ```
 
 Unit / functional (always run in CI and on this VM):
@@ -152,12 +230,18 @@ UI references (MoonPay-grade restyle):
 
 ```
 src/lib/models.ts          catalog + unlock
+src/lib/swarm-id.ts        office codes + dc:<guildId>
 src/lib/assign.ts          pipeline / single-device placement
 src/lib/ledger.ts          instant credit math
 src/lib/engine/            llama2.c-style kernel, tokenizer, WebLLM
 src/server/hub.ts          presence, assignment, settlement
+src/server/pairing-store.ts  Discord↔device pairing
 src/app/api/signal         SSE + POST signaling
 src/components/hive-room   the group is the product
+crates/hive-core           guild map, pairing, catalog (Rust)
+crates/hive-discord        slash commands + standalone binary
+src-tauri                  Tauri 2 desktop shell + tray
+desktop-ui                 tiny bootstrap page for packaged builds
 ```
 
 ## Contributing

@@ -61,8 +61,17 @@ export function creditWallet(deviceId: string, amount: number) {
   setWallet(deviceId, getWallet(deviceId) + amount);
 }
 
+function poolKey(code: string): string {
+  const t = code.trim();
+  if (/^dc[:_-]?\d+$/i.test(t)) {
+    const digits = t.replace(/\D/g, "");
+    return `dc:${digits}`;
+  }
+  return t.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "HIVE";
+}
+
 export function getPool(code: string): number {
-  const key = code.toUpperCase();
+  const key = poolKey(code);
   if (state.pools[key] === undefined) {
     state.pools[key] = key === "HIVE" ? HIVE_POOL_STARTER : 0;
     persist();
@@ -71,7 +80,7 @@ export function getPool(code: string): number {
 }
 
 export function setPool(code: string, amount: number) {
-  state.pools[code.toUpperCase()] = Math.max(0, amount);
+  state.pools[poolKey(code)] = Math.max(0, amount);
   persist();
 }
 

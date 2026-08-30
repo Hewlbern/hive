@@ -1,6 +1,7 @@
 "use client";
 
 import { buildingCode } from "@/lib/probe";
+import { normalizeSwarmId } from "@/lib/swarm-id";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button } from "./ui/button";
@@ -15,8 +16,8 @@ export function Landing() {
 
   function join(e: FormEvent) {
     e.preventDefault();
-    const next = (code || "HIVE").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-    if (next) router.push(`/hive/${next}`);
+    const next = normalizeSwarmId(code || "HIVE");
+    if (next) router.push(`/hive/${encodeURIComponent(next)}`);
   }
 
   return (
@@ -49,8 +50,8 @@ export function Landing() {
               id="join-code"
               data-testid="join-code"
               value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              maxLength={8}
+              onChange={(e) => setCode(e.target.value)}
+              maxLength={32}
               className="h-16 w-full border-0 bg-transparent text-5xl font-semibold tracking-[0.18em] shadow-none focus:shadow-none"
               aria-label="Building code"
               autoComplete="off"

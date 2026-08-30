@@ -20,7 +20,11 @@
     "lint": "eslint",
     "test": "vitest run && playwright test",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:rust": "cargo test --workspace --exclude hive-desktop",
+    "desktop:dev": "cargo tauri dev",
+    "desktop:build": "cargo tauri build",
+    "discord": "cargo run -p hive-discord"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.80",

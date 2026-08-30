@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hive</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #0c0c10;
+        color: #f4f1fb;
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      }
+      .wrap {
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 2rem;
+        text-align: center;
+      }
+      h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+      p { color: #9b96ab; max-width: 28rem; line-height: 1.5; }
+      a {
+        display: inline-block;
+        margin-top: 1.25rem;
+        background: #7c5cff;
+        color: #fff;
+        text-decoration: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 999px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <h1>Hive desktop</h1>
+        <p>
+          Opening the Hive UI. If this stays here, start the web server
+          (<code>npm run build && npm start</code>) and reload.
+        </p>
+        <a id="open" href="http://127.0.0.1:43177/hive/HIVE">Open Hive</a>
+      </div>
+    </div>
+    <script>
+      const target =
+        (window.__HIVE_URL__ || "http://127.0.0.1:43177") + "/hive/HIVE";
+      document.getElementById("open").href = target;
+      // Prefer navigating the webview to the live app.
+      setTimeout(() => {
+        window.location.replace(target);
+      }, 200);
+    </script>
+  </body>
+</html>

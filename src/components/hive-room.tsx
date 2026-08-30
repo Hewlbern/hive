@@ -92,6 +92,7 @@ export function HiveRoom({ code }: { code: string }) {
                 ? "Your memory is in the pool. You earn as tokens move."
                 : "Optional. Join is free — models unlock when someone shares."}
             </p>
+            <DiscordPair deviceId={hive.selfId} />
           </section>
 
           <Catalog
@@ -206,6 +207,51 @@ export function HiveRoom({ code }: { code: string }) {
         onTopUp={hive.topUp}
         onLightningConfirm={hive.confirmLightning}
       />
+    </div>
+  );
+}
+
+function DiscordPair({ deviceId }: { deviceId: string }) {
+  const [code, setCode] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!deviceId) return null;
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <p className="label">Discord pairing</p>
+      <p className="mt-1 text-sm text-muted">
+        Show a 6-character code, then run <code className="text-violet-soft">/share</code> in Discord.
+      </p>
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        className="mt-3"
+        data-testid="discord-pair"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            const next = Array.from(crypto.getRandomValues(new Uint8Array(3)))
+              .map((b) => b.toString(16).padStart(2, "0"))
+              .join("")
+              .slice(0, 6)
+              .toUpperCase();
+            const res = await fetch("/api/pairing/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ code: next, deviceId }),
+            });
+            if (!res.ok) throw new Error("register failed");
+            setCode(next);
+          } catch {
+            setCode(null);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "…" : code ? `Code ${code}` : "Get pairing code"}
+      </Button>
     </div>
   );
 }

@@ -35,6 +35,7 @@ import type {
 import { CREDIT_PER_TOKEN, DEFAULT_MAX_TOKENS, HEARTBEAT_MS } from "./protocol";
 import { HiveMesh } from "./rtc";
 import { connectSignal, type SignalClient } from "./signal";
+import { normalizeSwarmId } from "./swarm-id";
 
 export type HiveState = {
   code: string;
@@ -72,14 +73,15 @@ export function useHive(code: string) {
   useEffect(() => {
     setSelfId(getDeviceId());
   }, []);
+  const swarmCode = normalizeSwarmId(code);
   const [state, setState] = useState<HiveState>(() => ({
-    code: code.toUpperCase(),
+    code: swarmCode,
     selfId: "",
     selfName: "you",
     members: [],
     catalog: buildCatalog([]),
     assignments: [],
-    pool: emptyPool(code.toUpperCase()),
+    pool: emptyPool(swarmCode),
     wallet: null,
     history: [],
     messages: [],
@@ -348,7 +350,7 @@ export function useHive(code: string) {
       const pending = probeRef.current;
       signal.send({
         type: "join",
-        code: code.toUpperCase(),
+        code: swarmCode,
         member: {
           id: selfId,
           name,
@@ -385,7 +387,7 @@ export function useHive(code: string) {
     const onLeave = () => send({ type: "leave" });
     window.addEventListener("pagehide", onLeave);
 
-    void fetch(`/api/ledger?deviceId=${selfId}&code=${code.toUpperCase()}`)
+    void fetch(`/api/ledger?deviceId=${selfId}&code=${encodeURIComponent(swarmCode)}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -416,7 +418,7 @@ export function useHive(code: string) {
       mesh.close();
       abortRef.current?.abort();
     };
-  }, [code, emitToken, selfId, send]);
+  }, [swarmCode, emitToken, selfId, send]);
 
   const setSharing = useCallback(
     (sharing: boolean) => {

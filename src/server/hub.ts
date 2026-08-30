@@ -34,6 +34,7 @@ import {
   setWallet,
   snapshotBalances,
 } from "./ledger-store";
+import { normalizeSwarmId } from "@/lib/swarm-id";
 
 type Subscriber = (msg: ServerToClient) => void;
 
@@ -76,7 +77,7 @@ const sessionEarned = g.__hive.sessionEarned;
 const sessionSpent = g.__hive.sessionSpent;
 
 function ensureBuilding(code: string): Building {
-  const key = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "HIVE";
+  const key = normalizeSwarmId(code);
   let b = buildings.get(key);
   if (!b) {
     b = {
@@ -553,9 +554,10 @@ function onToken(b: Building, fromId: string, event: { generationId: string; ind
 }
 
 export function notifyWallets(code: string, deviceIds: string[]) {
-  const b = buildings.get(code.toUpperCase());
+  const key = normalizeSwarmId(code);
+  const b = buildings.get(key);
   for (const id of deviceIds) {
-    emitTo(id, { type: "wallet", wallet: walletSnap(id, code.toUpperCase()) });
+    emitTo(id, { type: "wallet", wallet: walletSnap(id, key) });
   }
   if (b) {
     for (const id of b.members.keys()) {

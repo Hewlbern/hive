@@ -40,6 +40,11 @@ yarn-error.log*
 /playwright-report/
 /blob-report/
 
+# rust / tauri
+/target/
+/src-tauri/target/
+**/*.rs.bk
+
 # vercel
 .vercel
 
