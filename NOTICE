@@ -1,0 +1,18 @@
+Hive
+Copyright 2026 Mike Holborn
+
+This product is an independent remake. It is not affiliated with, endorsed by,
+or derived from the SwarmLLM codebase or brand assets.
+
+Third-party models used for the live hive-kernel path:
+
+- stories260K / tok512 (Karpathy tinyllamas / llama2.c export)
+  https://huggingface.co/karpathy/tinyllamas
+  Used as the Hive Nano checkpoint under the terms of that project.
+
+Optional runtime downloads (not vendored):
+
+- stories15M + tokenizer from the same tinyllamas repo (Hive 15)
+- Qwen 2.5 WebLLM builds from MLC (loaded only when a contributor selects them)
+
+Stripe, LNbits, and TURN credentials are never shipped. See `.env.example`.

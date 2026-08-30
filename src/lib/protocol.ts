@@ -142,7 +142,15 @@ export type ClientToServer =
   | { type: "generate"; request: GenerateRequest }
   | { type: "token"; event: TokenEvent }
   | { type: "abort"; generationId: string }
-  | { type: "heartbeat"; tokPerSec?: number; busy?: boolean; quality?: ConnectionQuality }
+  | {
+      type: "heartbeat";
+      tokPerSec?: number;
+      busy?: boolean;
+      quality?: ConnectionQuality;
+      sharing?: boolean;
+      vramMB?: number;
+      webgpu?: boolean;
+    }
   | { type: "activation-fallback"; generationId: string; to: string; data: number[]; pos: number; token: number }
   | { type: "rename"; name: string };
 

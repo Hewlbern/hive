@@ -2,6 +2,17 @@
   "name": "hive",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "author": "Mike Holborn",
+  "description": "Building-scale mesh inference. Join a group, optionally share compute, unlock models from pooled VRAM, pay contributors per token.",
+  "repository": {
+    "type": "git",
+    "url": "https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e.git"
+  },
+  "bugs": {
+    "url": "https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e"
+  },
+  "homepage": "https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e",
   "scripts": {
     "dev": "next dev -p 43177 --hostname 0.0.0.0",
     "build": "next build",

@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { assignFromRoster, assignSingleDevice } from "./assign";
 import { getDeviceId, getStoredName, storeName } from "./device";
+import {
+  buildCatalog,
+  catalogHeadline,
+  getModel,
+  pickRunnableModel,
+  pooledMB,
+  sharingMembers,
+} from "./models";
 import {
   clearSession,
   continueFromSample,
@@ -87,6 +96,7 @@ export function useHive(code: string) {
   const requestRef = useRef<GenerateRequest | null>(null);
   const hooksRef = useRef<RunnerHooks | null>(null);
   const sharingRef = useRef(false);
+  const probeRef = useRef<DeviceProbe | null>(null);
   const tokenIndexRef = useRef(0);
 
   const send = useCallback((message: ClientToServer) => {
@@ -137,6 +147,15 @@ export function useHive(code: string) {
             pool: msg.pool,
             error: null,
           }));
+          if (sharingRef.current && probeRef.current) {
+            send({
+              type: "share",
+              sharing: true,
+              vramMB: probeRef.current.vramMB,
+              webgpu: probeRef.current.webgpu,
+              kind: probeRef.current.kind,
+            });
+          }
           break;
         case "roster":
           setState((s) => ({
@@ -296,6 +315,7 @@ export function useHive(code: string) {
         const probe = await probeP;
         if (cancelled) return;
         const name = getStoredName() || defaultDeviceName(selfId);
+        probeRef.current = probe;
         setState((s) => ({ ...s, probe, selfName: name }));
         signal.send({
           type: "join",
@@ -315,7 +335,12 @@ export function useHive(code: string) {
     signalRef.current = signal;
 
     const hb = window.setInterval(() => {
-      send({ type: "heartbeat" });
+      send({
+        type: "heartbeat",
+        sharing: sharingRef.current,
+        vramMB: probeRef.current?.vramMB,
+        webgpu: probeRef.current?.webgpu,
+      });
     }, HEARTBEAT_MS);
 
     const onLeave = () => send({ type: "leave" });
@@ -357,8 +382,73 @@ export function useHive(code: string) {
   const setSharing = useCallback(
     (sharing: boolean) => {
       sharingRef.current = sharing;
-      setState((s) => ({ ...s, sharing }));
-      const probe = state.probe;
+      const probe = probeRef.current;
+      setState((s) => {
+        const self: Member = s.members.find((m) => m.id === selfId) ?? {
+          id: selfId,
+          name: s.selfName,
+          kind: probe?.kind ?? "unknown",
+          vramMB: probe?.vramMB ?? 256,
+          webgpu: probe?.webgpu ?? false,
+          sharing,
+          online: true,
+          layers: null,
+          tokPerSec: 0,
+          earnedSession: 0,
+          spentSession: 0,
+          quality: "good",
+          busy: false,
+          safari: probe?.safari ?? false,
+        };
+        const members = s.members.some((m) => m.id === selfId)
+          ? s.members.map((m) =>
+              m.id === selfId
+                ? {
+                    ...m,
+                    sharing,
+                    vramMB: probe?.vramMB ?? m.vramMB,
+                    webgpu: probe?.webgpu ?? m.webgpu,
+                    kind: probe?.kind ?? m.kind,
+                    online: true,
+                  }
+                : m,
+            )
+          : [...s.members, { ...self, sharing }];
+        const catalog = buildCatalog(members);
+        const { model, warning } = pickRunnableModel(s.selectedModelId, members);
+        const modelDef = model ? getModel(model.id) : null;
+        const assignments = modelDef
+          ? modelDef.split === "single"
+            ? assignSingleDevice(
+                sharingMembers(members).map((m) => ({
+                  id: m.id,
+                  vramMB: m.vramMB,
+                  webgpu: m.webgpu,
+                })),
+                modelDef.layers,
+                modelDef.vramMB,
+                modelDef.engine === "web-llm",
+              )
+            : assignFromRoster(members, modelDef.layers)
+          : [];
+        return {
+          ...s,
+          sharing,
+          members,
+          catalog,
+          assignments,
+          pool: {
+            code: s.code,
+            members: members.length,
+            sharing: sharingMembers(members).length,
+            pooledMB: pooledMB(members),
+            selectedModelId: s.selectedModelId,
+            activeModelId: model?.id ?? null,
+            warning,
+          },
+          status: warning ?? catalogHeadline(members),
+        };
+      });
       send({
         type: "share",
         sharing,
@@ -367,7 +457,7 @@ export function useHive(code: string) {
         kind: probe?.kind ?? "unknown",
       });
     },
-    [send, state.probe],
+    [selfId, send],
   );
 
   const selectModel = useCallback(

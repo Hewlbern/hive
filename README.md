@@ -1,106 +1,122 @@
 # Hive
 
-Your building can run a 27B. Pay the people whose phones make it possible.
+**Your building can run a 27B. Pay the people whose phones make it possible.**
 
-Hive is a **building-scale mesh inference** app. People join a group with a short code. Sharing a GPU is optional. Models unlock from the **pooled memory of whoever is sharing right now**. Tokens stream to every screen. Contributors are paid **per token, instantly**.
+Hive is an open-source, building-scale **mesh inference** app. People join a group with a short code or link. Sharing a GPU is optional. The model catalog unlocks from the **pooled memory of whoever is sharing right now**. Hidden states move peer-to-peer. Contributors are paid **per token, instantly**.
 
-This is a remake of the SwarmLLM *idea* — not their product, not their assets, not their protocol.
+License: [MIT](./LICENSE) · Copyright 2026 Mike Holborn / Hive
 
-## The core loop
+> This is a remake of an idea, not a clone. New name, new visual identity, new protocol. Not affiliated with SwarmLLM. Do not copy their assets.
 
-1. **Join a group.** Code or link. No account. You can sit in the room without lending compute.
-2. **Optionally share compute.** A phone or laptop taps *Share compute* and becomes a contributor. Their estimated WebGPU / CPU memory enters the pool.
-3. **The catalog unlocks live.** One phone opens Hive Nano. A laptop opens Qwen 0.5B–7B (if it has WebGPU and the VRAM). A busy office unlocks the 14B / 27B slots. Locked models stay visible, greyed, with what it would take (“another laptop, or two more phones”).
-4. **Prompt.** Anyone with credits can prompt. Generation uses the group’s pooled workers. If the active model no longer fits when someone leaves, Hive warns and falls back to the largest live model that still fits.
-5. **Settle as words appear.** 1 credit = 1 generated token. The requester is reserved on Send, then workers are paid per token in proportion to layers held.
+## Why
 
-Roles:
+Phones cannot hold a 27B. A floor of phones, laptops, and desktops might. The original same-room, no-server demo dies the moment someone is on guest Wi-Fi or LTE two floors down. And people will not lend a phone GPU for an IOU that settles next week.
 
-- **Member** (default) — can prompt, watch the swarm, see the catalog.
-- **Contributor** — member + share toggle on. Gets paid. Memory counts toward unlocks.
-- A device can be both.
+Hive is the opposite loop:
+
+1. **Join the group.** That is the product. No account. You can watch and prompt without lending compute.
+2. **Optionally share.** A device that taps *Share compute* becomes a contributor. Its estimated VRAM enters the pool.
+3. **Unlock what the room can actually run.** One phone opens a tiny model. A handful of laptops open 7B. A busy office unlocks the 14B / 27B slots. Locked models stay visible, greyed, with what it would take.
+4. **Pay as words appear.** 1 credit = 1 token. The requester is reserved on Send. Workers are paid on each token, split by layers held.
+
+## Architecture
+
+```
+  phones / laptops / desktops
+           │  join code or /hive/HIVE
+           ▼
+     signaling (this app)
+     SSE + POST /api/signal
+     join · leave · SDP/ICE · assignment · pay events
+           │
+           ├─ WebRTC data channels ── activations (fp32 hidden states)
+           │                          tokens also fan out on signaling
+           │
+           └─ ledger (JSON file)
+              instant debit/credit, no Stripe per token
+```
+
+**Group join, then compute.** A member is in the building even at 0 GB shared. Their presence does not unlock models. A contributor’s memory does.
+
+**Catalog gated by pooled VRAM.** `src/lib/models.ts` sums sharing devices. Pipeline models (Hive Nano / Hive 15) unlock from the *sum*. WebLLM models unlock when *one* sharing device has WebGPU and enough VRAM. 14B / 27B use the same unlock math; this build will not load those checkpoints and falls back honestly.
+
+**WebRTC layer-split.** `src/lib/assign.ts` gives each contributor a contiguous layer range, bigger devices more layers. The hive-kernel runs those layers locally and sends the hidden state to the next hop. Single-device mode is the same kernel with one assignment covering every layer.
+
+**Instant credits.** `src/lib/ledger.ts` is the unit of account. Stripe / Lightning are top-up rails only. If keys are missing, the demo wallet still settles in milliseconds and is marked TEST.
+
+Signaling never carries model weights when Cache Storage / the CDN can serve them. Activations stay on data channels when ICE works; they fall back over signaling if a NAT blocks P2P so the demo still finishes.
 
 ## What actually runs
 
 | Model | Live? | How it runs |
 | --- | --- | --- |
-| **Hive Nano** (260K, 5 layers) | Yes | Real Llama-style kernel, layer-split over the mesh. Weights are in `public/models/`. |
-| **Hive 15** (15M, 6 layers) | Yes | Same kernel. Downloads ~60 MB from Hugging Face on first use, cached in Cache Storage. |
-| **Qwen 2.5 0.5B / 1.5B / 3B / 7B** 4-bit | Yes, if a sharing device has WebGPU *and* enough VRAM | [WebLLM](https://github.com/mlc-ai/web-llm) on that one device. Tokens still fan out to the group. WebLLM cannot layer-split. |
-| **Qwen 2.5 14B / Qwen 3 27B** 4-bit | Protocol only | Assignment + unlock math is live. This build will not load those checkpoints. Selecting them falls back to the largest live model, with a clear warning. |
+| **Hive Nano** (260K, 5 layers) | Yes | Real Llama-style kernel. Weights in `public/models/`. Layer-split ready. |
+| **Hive 15** (15M, 6 layers) | Yes | Same kernel. ~60 MB from Hugging Face on first use, cached. |
+| **Qwen 2.5 0.5B–7B** 4-bit | Yes, if one sharing device has WebGPU + VRAM | [WebLLM](https://github.com/mlc-ai/web-llm) on that device. Tokens still fan out. |
+| **Qwen 2.5 14B / Qwen 3 27B** 4-bit | Protocol only | Unlock + assignment are live. Selecting them falls back to the largest live model. |
 
-Single-device mode works: one laptop sharing can run the whole Nano (or Qwen, if it fits).
-
-A fake 27B tokenizer is **not** the generate path. Nano’s `generate()` is a real forward pass on real weights. On WebGPU-capable machines, Qwen is a real WebLLM `chat.completions` call.
+A simulated 27B tokenizer is not the generate path.
 
 ## Run locally
 
 ```bash
 npm i
+cp .env.example .env.local    # optional; empty keys → demo wallet
 npm test
 npm run dev
 ```
 
-Open [http://127.0.0.1:43177/hive/HIVE](http://127.0.0.1:43177/hive/HIVE) in two browsers.
+Then open [http://127.0.0.1:43177](http://127.0.0.1:43177).
 
-1. Tab A: tap **Share compute**.
-2. Watch the catalog unlock (Nano, then Hive 15; Qwen if the machine reports enough VRAM).
-3. Tab B: type a prompt. You do **not** need to share.
-4. Tokens appear on both screens. A’s earnings tick up; B’s credits tick down.
-5. A third tab at a phone viewport can join as a contributor.
+## How to join a group
 
-The seeded building code `HIVE` always exists and ships with an office pool of test credits.
+- **Start a building:** landing page → *Start a building swarm* (random four-letter code).
+- **Join with a code:** type the code on the landing page, or open `/hive/CODE`.
+- **Seeded demo:** [`/hive/HIVE`](http://127.0.0.1:43177/hive/HIVE) always exists and ships an office pool of test credits.
 
-## Payments
+In two browsers (or two profiles — same-origin localStorage is one device):
 
-The unit of account is a **prepaid swarm credit**. **1 credit ≈ 1 generated token.** There is no Stripe round-trip per token — the ledger is local and instant.
+1. Both open `/hive/HIVE`. You are members. The catalog is locked.
+2. Tab A taps **Share compute**. Nano / Hive 15 unlock immediately. Qwen unlocks if that machine reports enough WebGPU memory.
+3. Tab B types a prompt. B does not need to share. Tokens appear on both screens.
+4. A’s earnings tick up. B’s credits tick down. Top up from the ₳ wallet (TEST packs if Stripe is unset).
+5. A third tab at a phone viewport can join as a contributor. More pooled memory unlocks more of the catalog.
 
-- Every new device wallet starts with **400 TEST credits**.
-- Building `HIVE` starts with a **5,000 credit office pool**. Members can spend from it when their wallet is short.
-- Top-up packs: **$5 → 500**, **$20 → 2,200**, **$50 → 6,000**.
-- **Demo rail (default):** one tap credits the wallet. Clearly marked TEST.
-- **Stripe test mode:** set the keys below. `/api/topup` creates a PaymentIntent; `/api/webhook/stripe` credits the ledger.
-- **Lightning:** set LNbits, or use the test invoice + “I paid”. WebLN can be pointed at the bolt11.
+## Environment variables
 
-Copy `.env.example` to `.env.local`:
+Copy `.env.example` to `.env.local`. **Never commit a real `.env`.**
 
-```
-STRIPE_SECRET_KEY=
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-STRIPE_WEBHOOK_SECRET=
-LNBITS_URL=
-LNBITS_ADMIN_KEY=
-```
-
-## Office-building networking
-
-The original “same room, four-letter code, no servers” design dies across VLANs, guest Wi-Fi, and phone LTE. Hive uses a **signaling server** (this Next.js app: SSE + POST on `/api/signal`).
-
-It carries join/leave, SDP/ICE, layer assignment, and payment events. **Weights and hidden states do not transit the server** when WebRTC is up. If a NAT blocks data channels, activations fall back over signaling so the demo still completes, and the UI stays honest.
-
-**STUN** is on by default (`stun.l.google.com`) so two tabs on one machine always connect.
-
-**TURN** is how you survive office NATs. Point Hive at Metered, Twilio, or the bundled coturn:
-
-```
-NEXT_PUBLIC_STUN_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
-NEXT_PUBLIC_TURN_URL=turn:127.0.0.1:3478
-NEXT_PUBLIC_TURN_USERNAME=hive
-NEXT_PUBLIC_TURN_CREDENTIAL=hive-dev
-```
+| Variable | Purpose |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | Stripe test secret. Empty → demo wallet. |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key. |
+| `STRIPE_WEBHOOK_SECRET` | Verifies `/api/webhook/stripe`. |
+| `LNBITS_URL` / `LNBITS_ADMIN_KEY` | Real Lightning invoices. Empty → test invoice + *I paid*. |
+| `NEXT_PUBLIC_STUN_URLS` | Default: Google STUN. Enough for two tabs on one machine. |
+| `NEXT_PUBLIC_TURN_URL` | `turn:host:3478` (Metered, Twilio, or local coturn). |
+| `NEXT_PUBLIC_TURN_USERNAME` / `NEXT_PUBLIC_TURN_CREDENTIAL` | TURN auth. |
+| `HIVE_LEDGER_PATH` | Ledger JSON path. Default `data/ledger.json` (gitignored). |
 
 ```bash
+# optional local TURN
 docker compose up -d
+# then set NEXT_PUBLIC_TURN_* to turn:127.0.0.1:3478 / hive / hive-dev
 ```
 
-Vercel can host the UI and the ledger API. Persistent SSE/WebSocket across many instances needs a dedicated signaling process (or Durable Objects / PartyKit). One Node process is enough for a single office.
+## Payments in test mode
+
+- Unit: **1 credit = 1 generated token**.
+- New device wallet: **400 TEST credits**.
+- Building `HIVE` office pool: **5,000 credits**. Members can spend from the pool when their wallet is short.
+- Packs: **$5 → 500**, **$20 → 2,200**, **$50 → 6,000**.
+- **No Stripe keys:** the ₳ sheet is a one-tap demo rail, marked TEST. Credits appear immediately.
+- **Stripe test mode:** `/api/topup` creates a PaymentIntent; the webhook credits the ledger. Use Stripe test cards.
+- **Lightning:** LNbits if configured; otherwise a test bolt11 and *I paid (test)*.
+- There is no “settle later” path and no marketplace.
 
 ## iOS / Safari
 
-- **Join, watch, prompt, get paid:** works.
-- **WebGPU:** present on recent Safari / iOS, but memory is tight. Hive treats those devices as small contributors. Qwen will stay locked unless a laptop is sharing.
-- **WebRTC:** guest Wi-Fi and LTE often need TURN.
-- Installable as a PWA (Add to Home Screen).
+Join, watch, prompt, and get paid work. WebGPU is limited or missing; Hive treats those phones as small contributors (Nano still runs on CPU). Guest Wi-Fi and LTE usually need TURN. The app is a PWA (Add to Home Screen).
 
 ## Tests
 
@@ -108,8 +124,47 @@ Vercel can host the UI and the ledger API. Persistent SSE/WebSocket across many 
 npm test
 ```
 
-Covers layer assignment (memory budgets, more devices than layers, single-device WebLLM placement), ledger splits and reserves, catalog unlock / fallback, and a real Nano forward pass on the vendored checkpoint.
+Layer assignment (memory budgets, more workers than layers, single-device WebLLM placement), ledger reserve/split/release, catalog unlock and fallback, and a real Nano forward pass on the vendored checkpoint.
 
-## Stack
+## Project layout
 
-Next.js App Router, TypeScript, Tailwind. Signaling and ledger live in the same Node process. WebRTC is native `RTCPeerConnection`. No account required to join.
+```
+src/lib/models.ts          catalog + unlock
+src/lib/assign.ts          pipeline / single-device placement
+src/lib/ledger.ts          instant credit math
+src/lib/engine/            llama2.c-style kernel, tokenizer, WebLLM
+src/server/hub.ts          presence, assignment, settlement
+src/app/api/signal         SSE + POST signaling
+src/components/hive-room   the group is the product
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md). PRs that keep the join-then-unlock loop intact are welcome.
+
+## Acknowledgments
+
+Hive Nano uses the `stories260K` / `tok512` export from [karpathy/tinyllamas](https://huggingface.co/karpathy/tinyllamas) (llama2.c). Qwen checkpoints are loaded at runtime via MLC WebLLM when selected. See [NOTICE](./NOTICE).
+
+## Make this repository public
+
+This Origin repo was created **private**. The `origin` CLI in this environment cannot flip visibility.
+
+**Repo:** https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e  
+**Clone:** `https://origin.cursor.com/mike-holborn/tmp-7f0ce07852d4181e.git`
+
+**Origin (Cursor) click-path**
+
+1. Open the repo URL above while logged in as the owner (Mike Holborn).
+2. Open **Settings** (gear) on the repository.
+3. Find **Visibility** / **Danger zone**.
+4. Change visibility from **Private** to **Public**.
+5. Confirm.
+
+If you publish a GitHub copy from the Cursor **Create repo** control:
+
+1. GitHub → the new repo → **Settings**.
+2. Scroll to **Danger Zone**.
+3. **Change repository visibility** → **Public** → confirm.
+
+Until that switch is flipped, other people cannot star or clone it.

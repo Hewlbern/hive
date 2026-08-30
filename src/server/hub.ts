@@ -359,6 +359,20 @@ export function handleMessage(deviceId: string, msg: ClientToServer): ServerToCl
       if (msg.tokPerSec !== undefined) me.tokPerSec = msg.tokPerSec;
       if (msg.busy !== undefined) me.busy = msg.busy;
       if (msg.quality) me.quality = msg.quality;
+      let rosterDirty = false;
+      if (msg.sharing !== undefined && me.sharing !== msg.sharing) {
+        me.sharing = msg.sharing;
+        rosterDirty = true;
+      }
+      if (msg.vramMB !== undefined && msg.vramMB > 0 && me.vramMB !== msg.vramMB) {
+        me.vramMB = msg.vramMB;
+        rosterDirty = true;
+      }
+      if (msg.webgpu !== undefined && me.webgpu !== msg.webgpu) {
+        me.webgpu = msg.webgpu;
+        rosterDirty = true;
+      }
+      if (rosterDirty) broadcastRoster(b);
       break;
     }
     case "signal": {
