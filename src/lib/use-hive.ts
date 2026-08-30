@@ -1,0 +1,475 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getDeviceId, getStoredName, storeName } from "./device";
+import {
+  clearSession,
+  continueFromSample,
+  handleFallbackActivation,
+  handleIncomingActivation,
+  runGeneration,
+  type RunnerHooks,
+} from "./engine/runner";
+import { defaultDeviceName, probeDevice, type DeviceProbe } from "./probe";
+import type {
+  CatalogEntryView,
+  ChatMessage,
+  ClientToServer,
+  GenerateRequest,
+  LayerAssignment,
+  Member,
+  PoolSnapshot,
+  ServerToClient,
+  TopUpRecord,
+  WalletSnapshot,
+} from "./protocol";
+import { CREDIT_PER_TOKEN, DEFAULT_MAX_TOKENS, HEARTBEAT_MS } from "./protocol";
+import { HiveMesh } from "./rtc";
+import { connectSignal, type SignalClient } from "./signal";
+
+export type HiveState = {
+  code: string;
+  selfId: string;
+  selfName: string;
+  members: Member[];
+  catalog: CatalogEntryView[];
+  assignments: LayerAssignment[];
+  pool: PoolSnapshot | null;
+  wallet: WalletSnapshot | null;
+  history: TopUpRecord[];
+  messages: ChatMessage[];
+  sharing: boolean;
+  probe: DeviceProbe | null;
+  selectedModelId: string | null;
+  generating: boolean;
+  status: string | null;
+  error: string | null;
+  connected: boolean;
+  payFromPool: boolean;
+};
+
+const emptyPool = (code: string): PoolSnapshot => ({
+  code,
+  members: 0,
+  sharing: 0,
+  pooledMB: 0,
+  selectedModelId: null,
+  activeModelId: null,
+  warning: null,
+});
+
+export function useHive(code: string) {
+  const selfId = useMemo(() => getDeviceId(), []);
+  const [state, setState] = useState<HiveState>(() => ({
+    code: code.toUpperCase(),
+    selfId,
+    selfName: getStoredName() || defaultDeviceName(selfId),
+    members: [],
+    catalog: [],
+    assignments: [],
+    pool: emptyPool(code.toUpperCase()),
+    wallet: null,
+    history: [],
+    messages: [],
+    sharing: false,
+    probe: null,
+    selectedModelId: null,
+    generating: false,
+    status: null,
+    error: null,
+    connected: false,
+    payFromPool: true,
+  }));
+
+  const signalRef = useRef<SignalClient | null>(null);
+  const meshRef = useRef<HiveMesh | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const requestRef = useRef<GenerateRequest | null>(null);
+  const hooksRef = useRef<RunnerHooks | null>(null);
+  const sharingRef = useRef(false);
+  const tokenIndexRef = useRef(0);
+
+  const send = useCallback((message: ClientToServer) => {
+    signalRef.current?.send(message);
+  }, []);
+
+  const emitToken = useCallback(
+    (generationId: string, token: string, done: boolean, tokPerSec: number, tokenId?: number) => {
+      send({
+        type: "token",
+        event: {
+          generationId,
+          index: tokenIndexRef.current++,
+          token,
+          tokenId,
+          done,
+          tokPerSec,
+        },
+      });
+    },
+    [send],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const mesh = new HiveMesh(selfId, {
+      sendSignal: (to, payload) => send({ type: "signal", to, payload }),
+      onData: (from, data) => {
+        if (typeof data !== "string" && requestRef.current) {
+          handleIncomingActivation(data, hooksRef.current!);
+        }
+        void from;
+      },
+      onState: () => {
+        /* roster heartbeats carry quality */
+      },
+    });
+    meshRef.current = mesh;
+
+    const onMessage = (msg: ServerToClient) => {
+      if (cancelled) return;
+      switch (msg.type) {
+        case "welcome":
+          setState((s) => ({
+            ...s,
+            connected: true,
+            wallet: msg.wallet,
+            pool: msg.pool,
+            error: null,
+          }));
+          break;
+        case "roster":
+          setState((s) => ({
+            ...s,
+            members: msg.members,
+            catalog: msg.catalog,
+            assignments: msg.assignments,
+            pool: msg.pool,
+            selectedModelId: msg.pool.selectedModelId ?? s.selectedModelId,
+          }));
+          for (const m of msg.members) {
+            if (m.id !== selfId && m.online) void mesh.ensure(m.id);
+          }
+          if (msg.pool.warning) {
+            setState((s) => ({ ...s, status: msg.pool.warning }));
+          }
+          break;
+        case "wallet":
+          setState((s) => ({ ...s, wallet: msg.wallet }));
+          break;
+        case "signal":
+          void mesh.handleSignal(msg.from, msg.payload);
+          break;
+        case "generate":
+          requestRef.current = msg.request;
+          tokenIndexRef.current = 0;
+          setState((s) => ({
+            ...s,
+            generating: true,
+            status: `Thinking on ${msg.request.modelId}…`,
+            messages: [
+              ...s.messages,
+              {
+                id: msg.request.generationId + "-user",
+                role: "you",
+                authorId: msg.request.requesterId,
+                authorName: s.members.find((m) => m.id === msg.request.requesterId)?.name,
+                text: msg.request.prompt,
+                modelId: msg.request.modelId,
+              },
+              {
+                id: msg.request.generationId,
+                role: "swarm",
+                text: "",
+                modelId: msg.request.modelId,
+                live: true,
+              },
+            ],
+          }));
+          void startLocalRun(msg.request);
+          break;
+        case "token":
+          if (msg.event.tokenId !== undefined && hooksRef.current) {
+            continueFromSample(msg.event.tokenId, hooksRef.current);
+          }
+          setState((s) => ({
+            ...s,
+            generating: !msg.event.done,
+            messages: s.messages.map((m) =>
+              m.id === msg.event.generationId
+                ? { ...m, text: m.text + (msg.event.token || ""), live: !msg.event.done }
+                : m,
+            ),
+          }));
+          if (msg.event.done) {
+            requestRef.current = null;
+            clearSession();
+          }
+          break;
+        case "pay":
+          setState((s) => {
+            if (!s.wallet) return s;
+            const mine = msg.event.balances[selfId];
+            return {
+              ...s,
+              wallet: {
+                ...s.wallet,
+                balance: mine ?? s.wallet.balance,
+                poolBalance: msg.event.poolBalance,
+                sessionEarned:
+                  s.wallet.sessionEarned +
+                  (msg.event.splits.find((x) => x.deviceId === selfId)?.credits ?? 0),
+                sessionSpent:
+                  msg.event.requesterId === selfId
+                    ? s.wallet.sessionSpent + msg.event.requesterDebit
+                    : s.wallet.sessionSpent,
+              },
+            };
+          });
+          break;
+        case "abort":
+          abortRef.current?.abort();
+          clearSession();
+          requestRef.current = null;
+          setState((s) => ({
+            ...s,
+            generating: false,
+            error: msg.reason,
+            messages: s.messages.map((m) =>
+              m.id === msg.generationId ? { ...m, live: false } : m,
+            ),
+          }));
+          break;
+        case "error":
+          setState((s) => ({ ...s, error: msg.message, generating: false }));
+          break;
+        case "activation-fallback":
+          if (hooksRef.current) {
+            handleFallbackActivation(
+              msg.data,
+              msg.pos,
+              msg.token,
+              msg.generationId,
+              hooksRef.current,
+            );
+          }
+          break;
+      }
+    };
+
+    async function startLocalRun(request: GenerateRequest) {
+      const meshNow = meshRef.current;
+      if (!meshNow) return;
+      abortRef.current?.abort();
+      const abort = new AbortController();
+      abortRef.current = abort;
+      const hooks: RunnerHooks = {
+        mesh: meshNow,
+        selfId,
+        sendActivationFallback: (to, data, pos, token) =>
+          send({
+            type: "activation-fallback",
+            generationId: request.generationId,
+            to,
+            data,
+            pos,
+            token,
+          }),
+        emitToken,
+        onStatus: (text) => setState((s) => ({ ...s, status: text })),
+      };
+      hooksRef.current = hooks;
+      try {
+        await runGeneration(request, hooks, abort.signal);
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          error: err instanceof Error ? err.message : "Generation failed",
+          generating: false,
+        }));
+      }
+    }
+
+    const probeP = probeDevice();
+    const signal = connectSignal(selfId, onMessage, () => {
+      void (async () => {
+        const probe = await probeP;
+        if (cancelled) return;
+        const name = getStoredName() || defaultDeviceName(selfId);
+        setState((s) => ({ ...s, probe, selfName: name }));
+        signal.send({
+          type: "join",
+          code: code.toUpperCase(),
+          member: {
+            id: selfId,
+            name,
+            kind: probe.kind,
+            vramMB: probe.vramMB,
+            webgpu: probe.webgpu,
+            sharing: sharingRef.current,
+            safari: probe.safari || probe.ios,
+          },
+        });
+      })();
+    });
+    signalRef.current = signal;
+
+    const hb = window.setInterval(() => {
+      send({ type: "heartbeat" });
+    }, HEARTBEAT_MS);
+
+    const onLeave = () => send({ type: "leave" });
+    window.addEventListener("pagehide", onLeave);
+
+    void fetch(`/api/ledger?deviceId=${selfId}&code=${code.toUpperCase()}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setState((s) => ({
+          ...s,
+          history: data.history ?? [],
+          wallet: s.wallet
+            ? s.wallet
+            : {
+                deviceId: selfId,
+                balance: data.balance ?? 0,
+                sessionEarned: 0,
+                sessionSpent: 0,
+                poolBalance: data.poolBalance ?? 0,
+                testMode: data.testMode ?? true,
+                rail: "demo",
+              },
+        }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(hb);
+      window.removeEventListener("pagehide", onLeave);
+      onLeave();
+      signal.close();
+      mesh.close();
+      abortRef.current?.abort();
+    };
+  }, [code, emitToken, selfId, send]);
+
+  const setSharing = useCallback(
+    (sharing: boolean) => {
+      sharingRef.current = sharing;
+      setState((s) => ({ ...s, sharing }));
+      const probe = state.probe;
+      send({
+        type: "share",
+        sharing,
+        vramMB: probe?.vramMB ?? 256,
+        webgpu: probe?.webgpu ?? false,
+        kind: probe?.kind ?? "unknown",
+      });
+    },
+    [send, state.probe],
+  );
+
+  const selectModel = useCallback(
+    (modelId: string) => {
+      setState((s) => ({ ...s, selectedModelId: modelId }));
+      send({ type: "select-model", modelId });
+    },
+    [send],
+  );
+
+  const sendPrompt = useCallback(
+    (text: string) => {
+      const prompt = text.trim();
+      if (!prompt) return;
+      const generationId = crypto.randomUUID();
+      const modelId = state.selectedModelId || state.pool?.activeModelId || "hive-nano";
+      send({
+        type: "generate",
+        request: {
+          generationId,
+          requesterId: selfId,
+          modelId,
+          prompt,
+          maxTokens: DEFAULT_MAX_TOKENS,
+          temperature: 0.8,
+          assignments: [],
+          payFromPool: state.payFromPool,
+        },
+      });
+    },
+    [selfId, send, state.payFromPool, state.pool?.activeModelId, state.selectedModelId],
+  );
+
+  const rename = useCallback(
+    (name: string) => {
+      const next = name.slice(0, 24);
+      storeName(next);
+      setState((s) => ({ ...s, selfName: next }));
+      send({ type: "rename", name: next });
+    },
+    [send],
+  );
+
+  const topUp = useCallback(
+    async (pack: "5" | "20" | "50", rail: "demo" | "stripe" | "lightning" = "demo", target: "wallet" | "pool" = "wallet") => {
+      const res = await fetch("/api/topup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId: selfId,
+          code: state.code,
+          pack,
+          rail,
+          target,
+        }),
+      });
+      const data = await res.json();
+      if (data.invoice) return data as { invoice: string; credits: number; pack: string; rail: string };
+      if (data.clientSecret) return data as { clientSecret: string; credits: number };
+      setState((s) => ({
+        ...s,
+        status: `+${data.credits} credits (${data.rail === "demo" ? "TEST" : data.rail})`,
+      }));
+      return data;
+    },
+    [selfId, state.code],
+  );
+
+  const confirmLightning = useCallback(
+    async (pack: string) => {
+      await fetch("/api/topup/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: selfId, code: state.code, pack }),
+      });
+    },
+    [selfId, state.code],
+  );
+
+  const abort = useCallback(() => {
+    abortRef.current?.abort();
+    if (requestRef.current) send({ type: "abort", generationId: requestRef.current.generationId });
+  }, [send]);
+
+  const setPayFromPool = useCallback((payFromPool: boolean) => {
+    setState((s) => ({ ...s, payFromPool }));
+  }, []);
+
+  const me = state.members.find((m) => m.id === selfId) ?? null;
+
+  return {
+    ...state,
+    me,
+    creditPerToken: CREDIT_PER_TOKEN,
+    setSharing,
+    selectModel,
+    sendPrompt,
+    rename,
+    topUp,
+    confirmLightning,
+    abort,
+    setPayFromPool,
+    clearError: () => setState((s) => ({ ...s, error: null })),
+  };
+}

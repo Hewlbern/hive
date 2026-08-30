@@ -1,0 +1,16 @@
+services:
+  coturn:
+    image: coturn/coturn:4.6.3
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+    command: >
+      -n
+      --log-file=stdout
+      --listening-port=3478
+      --fingerprint
+      --lt-cred-mech
+      --user=hive:hive-dev
+      --realm=hive.local
+      --no-cli
+    restart: unless-stopped

@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #090b08;
+  --bg-elev: #12150f;
+  --bg-panel: #161a12;
+  --ink: #f4efe4;
+  --muted: #9a937f;
+  --line: #2a2f22;
+  --amber: #f0c36a;
+  --honey: #f5b042;
+  --honey-deep: #c67a12;
+  --teal: #3dffe8;
+  --danger: #ff6b4a;
+  --ok: #8dffa3;
+  --locked: #5c5748;
+  --font-display: "Syne", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elev: var(--bg-elev);
+  --color-bg-panel: var(--bg-panel);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-honey: var(--honey);
+  --color-honey-deep: var(--honey-deep);
+  --color-teal: var(--teal);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-locked: var(--locked);
+  --font-sans: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-display), system-ui, sans-serif;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(245, 176, 66, 0.12), transparent 50%),
+    radial-gradient(ellipse 40% 40% at 100% 100%, rgba(61, 255, 232, 0.05), transparent 50%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='100' viewBox='0 0 56 100'><path fill='none' stroke='%232a2f22' stroke-width='0.6' d='M28 0v20l24 14v28L28 76 4 62V34L28 20z'/></svg>");
+  background-size: auto, auto, 56px 100px;
+}
+
+::selection {
+  background: rgba(245, 176, 66, 0.35);
+  color: var(--ink);
+}
+
+button, input, textarea { font: inherit; }
+
+.hive-panel {
+  background: color-mix(in oklab, var(--bg-panel) 88%, transparent);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(16px);
+}
+
+.hive-glow {
+  box-shadow: 0 0 0 1px rgba(245, 176, 66, 0.25), 0 0 40px rgba(245, 176, 66, 0.08);
+}
+
+@keyframes pulse-node {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@keyframes ticker {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-node { animation: pulse-node 2.4s ease-in-out infinite; }
+.animate-ticker { animation: ticker 220ms ease-out; }
+
+input, textarea {
+  background: #0d0f0b;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--honey);
+  box-shadow: 0 0 0 3px rgba(245, 176, 66, 0.15);
+}
