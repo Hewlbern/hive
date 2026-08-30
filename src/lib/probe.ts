@@ -59,9 +59,19 @@ export async function probeDevice(): Promise<DeviceProbe> {
   const kind = guessKind();
   const safari = isSafari();
   const ios = isIOS();
+  const cpu: DeviceProbe = {
+    kind,
+    vramMB: estimateFromLimits(kind, false, safari, ios),
+    webgpu: false,
+    safari,
+    ios,
+    note: "Running the CPU kernel. Fine for Nano; Qwen needs WebGPU.",
+  };
+
+  const gpuProbe = (async (): Promise<DeviceProbe> => {
   let webgpu = false;
-  let vramMB = estimateFromLimits(kind, false, safari, ios);
-  let note = "Running the CPU kernel. Fine for Nano; Qwen needs WebGPU.";
+  let vramMB = cpu.vramMB;
+  let note = cpu.note;
 
   try {
     const gpu = typeof navigator !== "undefined"
@@ -98,6 +108,14 @@ export async function probeDevice(): Promise<DeviceProbe> {
   }
 
   return { kind, vramMB, webgpu, safari, ios, note };
+  })();
+
+  return Promise.race([
+    gpuProbe,
+    new Promise<DeviceProbe>((resolve) => {
+      setTimeout(() => resolve({ ...cpu, note: "WebGPU probe timed out. Using the CPU kernel." }), 800);
+    }),
+  ]);
 }
 
 const TREES = [

@@ -16,27 +16,27 @@ export function Switch({
       type="button"
       role="switch"
       aria-checked={checked}
+      data-testid="share-toggle"
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "group inline-flex items-center gap-3 rounded-full border px-3 py-2 transition",
-        checked ? "border-honey/60 bg-honey/10" : "border-line bg-black/30",
+        "group inline-flex items-center gap-3 rounded-full px-1 py-1 transition",
         className,
       )}
     >
       <span
         className={cn(
-          "relative h-7 w-12 rounded-full transition",
-          checked ? "bg-honey" : "bg-line",
+          "relative h-8 w-14 rounded-full transition",
+          checked ? "bg-violet" : "bg-line",
         )}
       >
         <span
           className={cn(
-            "absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#1a1204] transition-transform",
-            checked && "translate-x-5",
+            "absolute top-1 left-1 h-6 w-6 rounded-full bg-white transition-transform",
+            checked && "translate-x-6",
           )}
         />
       </span>
-      {label ? <span className="text-sm font-medium">{label}</span> : null}
+      {label ? <span className="text-[15px] font-semibold">{label}</span> : null}
     </button>
   );
 }

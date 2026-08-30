@@ -5,6 +5,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    env: {
+      HIVE_LEDGER_PATH: path.resolve(__dirname, "data/ledger.test.json"),
+    },
   },
   resolve: {
     alias: {

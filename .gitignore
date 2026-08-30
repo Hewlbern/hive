@@ -36,6 +36,9 @@ yarn-error.log*
 
 # local ledger
 /data/*.json
+/test-results/
+/playwright-report/
+/blob-report/
 
 # vercel
 .vercel

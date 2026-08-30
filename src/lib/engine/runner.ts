@@ -8,7 +8,6 @@ import {
   sliceForAssignment,
 } from "./llama2";
 import { loadLlamaTokenizer, type LlamaTokenizer } from "./tokenizer";
-import { loadWebllm } from "./webllm";
 
 export type RunnerHooks = {
   mesh: HiveMesh;
@@ -85,6 +84,7 @@ export async function runGeneration(
 
   if (model.engine === "web-llm") {
     hooks.onStatus(`Loading ${model.name} on this device (WebGPU)…`);
+    const { loadWebllm } = await import("./webllm");
     const engine = await loadWebllm(model, hooks.onStatus);
     const t0 = performance.now();
     let n = 0;

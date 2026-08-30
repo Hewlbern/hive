@@ -121,10 +121,31 @@ Join, watch, prompt, and get paid work. WebGPU is limited or missing; Hive treat
 ## Tests
 
 ```bash
-npm test
+npm test          # unit + functional + Playwright E2E
+npm run test:unit # vitest only
+npm run test:e2e  # Playwright against next start on :43188 (not turbopack)
 ```
 
-Layer assignment (memory budgets, more workers than layers, single-device WebLLM placement), ledger reserve/split/release, catalog unlock and fallback, and a real Nano forward pass on the vendored checkpoint.
+Unit / functional (always run in CI and on this VM):
+
+- Layer assignment given memory budgets
+- Catalog unlock vs pooled VRAM, plus fallback when the pool shrinks
+- Ledger reserve, split-by-layers, unused release
+- Join / leave presence
+- Share-compute catalog updates
+- Prompt → token fan-out to every peer (fake kernel)
+- Demo wallet top-up
+- Out-of-credits refuse / mid-stream pause
+- Real Nano forward pass on the vendored checkpoint
+
+Playwright E2E: two Chromium contexts join `HIVE`, one shares, one prompts, both see tokens, balances move. If WebGPU is missing, the CPU hive-kernel still generates.
+
+UI references (MoonPay-grade restyle):
+
+- [docs/ui/landing.png](docs/ui/landing.png)
+- [docs/ui/group-room.png](docs/ui/group-room.png)
+- [docs/ui/mobile-contributor.png](docs/ui/mobile-contributor.png)
+- [docs/ui/wallet.png](docs/ui/wallet.png)
 
 ## Project layout
 

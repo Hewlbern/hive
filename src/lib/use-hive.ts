@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { assignFromRoster, assignSingleDevice } from "./assign";
 import { getDeviceId, getStoredName, storeName } from "./device";
 import {
@@ -68,13 +68,16 @@ const emptyPool = (code: string): PoolSnapshot => ({
 });
 
 export function useHive(code: string) {
-  const selfId = useMemo(() => getDeviceId(), []);
+  const [selfId, setSelfId] = useState("");
+  useEffect(() => {
+    setSelfId(getDeviceId());
+  }, []);
   const [state, setState] = useState<HiveState>(() => ({
     code: code.toUpperCase(),
-    selfId,
-    selfName: getStoredName() || defaultDeviceName(selfId),
+    selfId: "",
+    selfName: "you",
     members: [],
-    catalog: [],
+    catalog: buildCatalog([]),
     assignments: [],
     pool: emptyPool(code.toUpperCase()),
     wallet: null,
@@ -121,7 +124,9 @@ export function useHive(code: string) {
   );
 
   useEffect(() => {
+    if (!selfId) return;
     let cancelled = false;
+    setState((s) => ({ ...s, selfId, selfName: getStoredName() || defaultDeviceName(selfId) }));
     const mesh = new HiveMesh(selfId, {
       sendSignal: (to, payload) => send({ type: "signal", to, payload }),
       onData: (from, data) => {
@@ -158,14 +163,20 @@ export function useHive(code: string) {
           }
           break;
         case "roster":
-          setState((s) => ({
-            ...s,
-            members: msg.members,
-            catalog: msg.catalog,
-            assignments: msg.assignments,
-            pool: msg.pool,
-            selectedModelId: msg.pool.selectedModelId ?? s.selectedModelId,
-          }));
+          setState((s) => {
+            const me = msg.members.find((m) => m.id === selfId);
+            return {
+              ...s,
+              members: msg.members,
+              catalog: msg.catalog,
+              assignments: msg.assignments,
+              pool: msg.pool,
+              selectedModelId: msg.pool.selectedModelId ?? s.selectedModelId,
+              wallet: s.wallet && me
+                ? { ...s.wallet, sessionEarned: Math.max(s.wallet.sessionEarned, me.earnedSession) }
+                : s.wallet,
+            };
+          });
           for (const m of msg.members) {
             if (m.id !== selfId && m.online) void mesh.ensure(m.id);
           }
@@ -174,7 +185,16 @@ export function useHive(code: string) {
           }
           break;
         case "wallet":
-          setState((s) => ({ ...s, wallet: msg.wallet }));
+          setState((s) => ({
+            ...s,
+            wallet: s.wallet
+              ? {
+                  ...msg.wallet,
+                  sessionEarned: Math.max(s.wallet.sessionEarned, msg.wallet.sessionEarned),
+                  sessionSpent: Math.max(s.wallet.sessionSpent, msg.wallet.sessionSpent),
+                }
+              : msg.wallet,
+          }));
           break;
         case "signal":
           void mesh.handleSignal(msg.from, msg.payload);
@@ -227,23 +247,35 @@ export function useHive(code: string) {
           break;
         case "pay":
           setState((s) => {
-            if (!s.wallet) return s;
-            const mine = msg.event.balances[selfId];
-            return {
-              ...s,
-              wallet: {
-                ...s.wallet,
-                balance: mine ?? s.wallet.balance,
-                poolBalance: msg.event.poolBalance,
-                sessionEarned:
-                  s.wallet.sessionEarned +
-                  (msg.event.splits.find((x) => x.deviceId === selfId)?.credits ?? 0),
-                sessionSpent:
-                  msg.event.requesterId === selfId
-                    ? s.wallet.sessionSpent + msg.event.requesterDebit
-                    : s.wallet.sessionSpent,
-              },
+            const credit = msg.event.splits
+              .filter((x) => x.deviceId === selfId)
+              .reduce((n, x) => n + x.credits, 0);
+            const earnedNow = msg.event.earned?.[selfId];
+            const members = s.members.map((m) => {
+              const total = msg.event.earned?.[m.id];
+              const add = msg.event.splits
+                .filter((x) => x.deviceId === m.id)
+                .reduce((n, x) => n + x.credits, 0);
+              if (total !== undefined) return { ...m, earnedSession: total };
+              return add ? { ...m, earnedSession: m.earnedSession + add } : m;
+            });
+            const prev = s.wallet;
+            const wallet = {
+              deviceId: selfId,
+              balance: msg.event.balances[selfId] ?? prev?.balance ?? 0,
+              sessionEarned: Math.max(
+                prev?.sessionEarned ?? 0,
+                earnedNow ?? (prev?.sessionEarned ?? 0) + credit,
+              ),
+              sessionSpent:
+                msg.event.requesterId === selfId
+                  ? (prev?.sessionSpent ?? 0) + msg.event.requesterDebit
+                  : (prev?.sessionSpent ?? 0),
+              poolBalance: msg.event.poolBalance,
+              testMode: prev?.testMode ?? true,
+              rail: prev?.rail ?? ("demo" as const),
             };
+            return { ...s, wallet, members };
           });
           break;
         case "abort":
@@ -311,26 +343,33 @@ export function useHive(code: string) {
 
     const probeP = probeDevice();
     const signal = connectSignal(selfId, onMessage, () => {
-      void (async () => {
-        const probe = await probeP;
+      if (cancelled) return;
+      const name = getStoredName() || defaultDeviceName(selfId);
+      const pending = probeRef.current;
+      signal.send({
+        type: "join",
+        code: code.toUpperCase(),
+        member: {
+          id: selfId,
+          name,
+          kind: pending?.kind ?? "laptop",
+          vramMB: pending?.vramMB ?? 320,
+          webgpu: pending?.webgpu ?? false,
+          sharing: sharingRef.current,
+          safari: pending?.safari ?? false,
+        },
+      });
+      void probeP.then((probe) => {
         if (cancelled) return;
-        const name = getStoredName() || defaultDeviceName(selfId);
         probeRef.current = probe;
         setState((s) => ({ ...s, probe, selfName: name }));
         signal.send({
-          type: "join",
-          code: code.toUpperCase(),
-          member: {
-            id: selfId,
-            name,
-            kind: probe.kind,
-            vramMB: probe.vramMB,
-            webgpu: probe.webgpu,
-            sharing: sharingRef.current,
-            safari: probe.safari || probe.ios,
-          },
+          type: "heartbeat",
+          sharing: sharingRef.current,
+          vramMB: probe.vramMB,
+          webgpu: probe.webgpu,
         });
-      })();
+      });
     });
     signalRef.current = signal;
 

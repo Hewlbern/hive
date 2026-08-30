@@ -43,56 +43,50 @@ export function WalletSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#0c0c10]/70 p-3 sm:items-center">
       <button className="absolute inset-0" aria-label="Close wallet" onClick={onClose} />
-      <div className="hive-panel relative z-10 w-full max-w-md rounded-3xl p-5 hive-glow">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">Wallet</p>
-            <p className="mt-1 text-3xl font-semibold">
-              ₳{formatCredits(wallet?.balance ?? 0)}
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              {wallet?.testMode ? "TEST credits · demo rail" : "Live rail"} · 1 credit = 1 token
-            </p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close
-          </Button>
+      <div className="sheet-lg glow-violet relative z-10 w-full max-w-md bg-bg-panel p-6 sm:p-8" data-testid="wallet-sheet">
+        <p className="label">Wallet</p>
+        <p className="mt-2 text-6xl font-semibold tracking-tight" data-testid="wallet-balance">
+          {formatCredits(wallet?.balance ?? 0)}
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          {wallet?.testMode ? "TEST credits" : "Credits"} · 1 credit = 1 token
+        </p>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <Stat label="Earned" value={formatCredits(wallet?.sessionEarned ?? 0)} />
+          <Stat label="Office pool" value={formatCredits(wallet?.poolBalance ?? 0)} />
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <Stat label="Earned this session" value={`₳${(wallet?.sessionEarned ?? 0).toFixed(1)}`} />
-          <Stat label="Office pool" value={`₳${formatCredits(wallet?.poolBalance ?? 0)}`} />
-        </div>
-
-        <div className="mt-5 flex gap-2">
+        <div className="mt-6 flex gap-2">
           <button
-            className={`rounded-full px-3 py-1 text-xs ${target === "wallet" ? "bg-honey text-[#1a1204]" : "border border-line"}`}
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${target === "wallet" ? "bg-violet text-white" : "bg-bg text-muted"}`}
             onClick={() => setTarget("wallet")}
           >
             My wallet
           </button>
           <button
-            className={`rounded-full px-3 py-1 text-xs ${target === "pool" ? "bg-honey text-[#1a1204]" : "border border-line"}`}
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${target === "pool" ? "bg-violet text-white" : "bg-bg text-muted"}`}
             onClick={() => setTarget("pool")}
           >
             Office pool
           </button>
         </div>
 
-        <p className="mt-4 text-sm text-muted">One-tap top-up. Credits land in a few seconds.</p>
+        <p className="mt-6 text-sm text-muted">Add credits. They land instantly on the demo rail.</p>
         <div className="mt-3 grid grid-cols-3 gap-2">
           {PACKS.map((p) => (
-            <Button
+            <button
               key={p.id}
-              variant="line"
+              data-testid={`topup-${p.id}`}
               disabled={busy !== null}
               onClick={() => pay(p.id, "demo")}
+              className="rounded-[22px] bg-bg py-4 text-center disabled:opacity-40"
             >
-              ${p.usd}
-              <span className="block text-[10px] font-mono text-muted">₳{p.credits}</span>
-            </Button>
+              <span className="block text-xl font-semibold">${p.usd}</span>
+              <span className="mt-1 block text-xs text-muted">{p.credits} cr</span>
+            </button>
           ))}
         </div>
         <Button
@@ -101,13 +95,13 @@ export function WalletSheet({
           disabled={busy !== null}
           onClick={() => pay("5", "lightning")}
         >
-          Lightning invoice · $5
+          Lightning · $5
         </Button>
 
         {invoice ? (
-          <div className="mt-4 rounded-2xl border border-line p-3">
+          <div className="mt-4 rounded-[22px] bg-bg p-4">
             <p className="text-xs text-muted">Test invoice. Mark paid to credit the ledger.</p>
-            <p className="mt-2 break-all font-mono text-[10px] text-honey">{invoice.bolt11}</p>
+            <p className="mt-2 break-all font-mono text-[10px] text-violet-soft">{invoice.bolt11}</p>
             <Button
               className="mt-3 w-full"
               size="sm"
@@ -122,20 +116,24 @@ export function WalletSheet({
         ) : null}
 
         <div className="mt-6">
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">Recent</p>
-          <ul className="mt-2 max-h-36 space-y-1 overflow-auto text-sm">
+          <p className="label">Recent</p>
+          <ul className="mt-2 max-h-32 space-y-2 overflow-auto text-sm">
             {history.length === 0 ? (
-              <li className="text-muted">No top-ups yet. Starter credits are already in this device wallet.</li>
+              <li className="text-muted">Starter credits are already on this device.</li>
             ) : (
               history.map((h) => (
                 <li key={h.id} className="flex justify-between text-muted">
                   <span>{h.note}</span>
-                  <span className="font-mono text-honey">+{h.credits}</span>
+                  <span className="text-violet-soft">+{h.credits}</span>
                 </li>
               ))
             )}
           </ul>
         </div>
+
+        <Button variant="ghost" className="mt-4 w-full" onClick={onClose}>
+          Done
+        </Button>
       </div>
     </div>
   );
@@ -143,9 +141,9 @@ export function WalletSheet({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-line p-3">
-      <p className="text-[11px] text-muted">{label}</p>
-      <p className="mt-1 font-mono text-lg">{value}</p>
+    <div className="rounded-[22px] bg-bg p-4">
+      <p className="label">{label}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   );
 }

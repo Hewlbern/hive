@@ -474,7 +474,10 @@ function onToken(b: Building, fromId: string, event: { generationId: string; ind
   const model = getModel(gen.request.modelId);
   const nLayers = model?.layers ?? 1;
 
-  if (!event.done) {
+  // Bill any real token, including the last one (done: true with text).
+  // The trailing empty done pulse from the runner is not work.
+  const billable = Boolean(event.token) || !event.done;
+  if (billable && gen.reserved >= CREDIT_PER_TOKEN) {
     const settled = applyTokenSettlement({
       reservedLeft: gen.reserved,
       assignments: gen.request.assignments,
@@ -505,16 +508,34 @@ function onToken(b: Building, fromId: string, event: { generationId: string; ind
       if (runner) runner.tokPerSec = event.tokPerSec;
     }
 
+    const involved = new Set<string>([
+      gen.request.requesterId,
+      ...settled.splits.map((s) => s.deviceId),
+    ]);
+    const balances: Record<string, number> = {};
+    for (const id of involved) {
+      balances[id] = settled.balances[id] ?? getWallet(id);
+    }
+
+    const earned: Record<string, number> = {};
+    for (const id of involved) {
+      earned[id] = sessionEarned.get(id) ?? 0;
+    }
+
     const pay: PayEvent = {
       generationId: event.generationId,
       requesterId: gen.request.requesterId,
       splits: settled.splits,
       requesterDebit: settled.requesterDebit,
       source: gen.source,
-      balances: settled.balances,
+      balances,
+      earned,
       poolBalance: getPool(b.code),
     };
     broadcast(b, { type: "pay", event: pay });
+    for (const id of involved) {
+      emitTo(id, { type: "wallet", wallet: walletSnap(id, b.code) });
+    }
   }
 
   broadcast(b, { type: "token", event });
@@ -557,6 +578,14 @@ export function getBuildingPublic(code: string) {
 
 export function seedHive() {
   ensureBuilding("HIVE");
+}
+
+export function resetHubForTests() {
+  buildings.clear();
+  subscribers.clear();
+  sessionEarned.clear();
+  sessionSpent.clear();
+  seedHive();
 }
 
 seedHive();

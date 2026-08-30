@@ -18,7 +18,9 @@
     "build": "next build",
     "start": "next start -p 43177 --hostname 0.0.0.0",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run && playwright test",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.80",
@@ -48,6 +50,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "typescript": "^5",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@playwright/test": "^1.55.0"
   }
 }

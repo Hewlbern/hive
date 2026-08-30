@@ -112,6 +112,7 @@ export type PayEvent = {
   requesterDebit: number;
   source: "wallet" | "pool";
   balances: Record<string, number>;
+  earned: Record<string, number>;
   poolBalance: number;
 };
 

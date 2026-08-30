@@ -101,3 +101,7 @@ export function isStripeConfigured(): boolean {
 export function isLightningConfigured(): boolean {
   return Boolean(process.env.LNBITS_URL && process.env.LNBITS_ADMIN_KEY);
 }
+
+export function resetLedgerForTests() {
+  state = empty();
+}

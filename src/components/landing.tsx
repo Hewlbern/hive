@@ -2,12 +2,12 @@
 
 import { buildingCode } from "@/lib/probe";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import { Button } from "./ui/button";
 
 export function Landing() {
   const router = useRouter();
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState("HIVE");
 
   function start() {
     router.push(`/hive/${buildingCode()}`);
@@ -20,88 +20,63 @@ export function Landing() {
   }
 
   return (
-    <div className="relative mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-5 py-8 sm:px-8">
+    <div className="relative mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 py-6">
       <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-honey">
+        <div className="flex items-center gap-2 text-ink">
           <HexMark />
-          <span className="text-lg font-semibold tracking-tight">Hive</span>
+          <span className="text-[17px] font-semibold tracking-tight">Hive</span>
         </div>
-        <a
-          href="/hive/HIVE"
-          className="font-mono text-xs uppercase tracking-[0.2em] text-muted hover:text-honey"
-        >
-          Open demo building HIVE
+        <a href="/hive/HIVE" className="text-sm text-muted hover:text-violet-soft">
+          Open HIVE
         </a>
       </header>
 
-      <main className="flex flex-1 flex-col justify-center gap-14 py-16 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-2xl">
-          <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.28em] text-honey">
-            Building-scale mesh inference
-          </p>
-          <h1 className="text-4xl leading-[1.05] font-semibold tracking-tight sm:text-6xl">
-            Your building can run a 27B.
-            <span className="block text-honey">
-              Pay the people whose phones make it possible.
-            </span>
-          </h1>
-          <p className="mt-6 max-w-xl text-lg text-muted">
-            Join a group first. Sharing compute is optional. Models unlock as the
-            office pools WebGPU memory — one phone opens Nano, a handful of
-            laptops opens 7B, a busy floor opens 27B.
-          </p>
+      <main className="flex flex-1 flex-col justify-center py-10">
+        <p className="label text-center">Building swarm</p>
+        <h1 className="mt-3 text-center text-[34px] leading-[1.12] font-semibold tracking-tight sm:text-5xl">
+          Your building can run a 27B
+        </h1>
+        <p className="mx-auto mt-4 max-w-sm text-center text-[16px] leading-relaxed text-muted">
+          Join a group. Share a phone if you want. Models unlock as the office pools memory — and contributors get paid per token.
+        </p>
 
-          <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button size="lg" onClick={start}>
-              Start a building swarm
-            </Button>
-            <form onSubmit={join} className="flex flex-1 gap-2">
-              <input
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="Join with a code"
-                maxLength={8}
-                className="h-12 w-full rounded-full px-5 font-mono tracking-[0.3em] sm:max-w-[220px]"
-                aria-label="Building code"
-              />
-              <Button type="submit" variant="line" size="lg">
-                Enter
-              </Button>
-            </form>
+        <form onSubmit={join} className="sheet glow-violet mx-auto mt-10 w-full p-6 sm:p-8">
+          <label className="label" htmlFor="join-code">
+            Group code
+          </label>
+          <div className="mt-3 flex items-end gap-3 border-b border-line pb-2">
+            <input
+              id="join-code"
+              data-testid="join-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              maxLength={8}
+              className="h-16 w-full border-0 bg-transparent text-5xl font-semibold tracking-[0.18em] shadow-none focus:shadow-none"
+              aria-label="Building code"
+              autoComplete="off"
+            />
+            <span className="mb-2 shrink-0 text-sm text-muted">code</span>
           </div>
-        </div>
+          <Button type="submit" size="lg" className="mt-6 w-full" data-testid="join-submit">
+            Join group
+          </Button>
+          <p className="mt-3 text-center text-sm text-muted">No account. Sharing compute is optional.</p>
+        </form>
 
-        <ol className="grid max-w-md gap-4 text-sm">
-          <Step n="01" title="Join the group">
-            A short code, or a link. No account. You can watch and prompt without
-            lending a GPU.
-          </Step>
-          <Step n="02" title="Someone shares">
-            Phones and laptops tap Share compute. Their memory unlocks the
-            catalog in real time.
-          </Step>
-          <Step n="03" title="Pay as you generate">
-            1 credit = 1 token. The requester is debited as words appear.
-            Contributors get paid the same instant.
-          </Step>
-        </ol>
+        <button
+          type="button"
+          data-testid="start-swarm"
+          onClick={start}
+          className="mt-6 text-center text-[15px] font-semibold text-violet-soft hover:text-violet"
+        >
+          Start a new building
+        </button>
       </main>
 
-      <footer className="flex flex-col gap-2 border-t border-line pt-6 text-xs text-muted sm:flex-row sm:justify-between">
-        <p>Not affiliated with SwarmLLM. New protocol, new name, new rail.</p>
-        <p className="font-mono">STUN default · TURN via env · demo wallet if Stripe is unset</p>
+      <footer className="pb-2 text-center text-xs text-muted">
+        Independent remake. MIT. Not affiliated with SwarmLLM or MoonPay.
       </footer>
     </div>
-  );
-}
-
-function Step({ n, title, children }: { n: string; title: string; children: ReactNode }) {
-  return (
-    <li className="hive-panel rounded-2xl p-4">
-      <p className="font-mono text-[11px] text-honey">{n}</p>
-      <p className="mt-1 text-base text-ink">{title}</p>
-      <p className="mt-1 text-muted">{children}</p>
-    </li>
   );
 }
 
@@ -116,8 +91,7 @@ export function HexMark({ className = "h-6 w-6" }: { className?: string }) {
       />
       <path
         d="M12 7.2 16.2 9.6v4.8L12 16.8 7.8 14.4V9.6L12 7.2Z"
-        fill="currentColor"
-        opacity="0.9"
+        fill="#7c5cff"
       />
     </svg>
   );

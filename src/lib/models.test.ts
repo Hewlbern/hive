@@ -83,5 +83,18 @@ describe("catalog unlock", () => {
     expect(line).toMatch(/2 devices/);
     expect(line).toMatch(/unlocked/);
   });
+
+  it("locks a previously unlocked 7B when the pool shrinks to a phone", () => {
+    const office = [
+      member({ id: "d1", vramMB: 10000, kind: "desktop" }),
+      member({ id: "d2", vramMB: 10000, kind: "desktop" }),
+    ];
+    expect(buildCatalog(office).find((m) => m.id === "qwen25-7")?.unlocked).toBe(true);
+    const phoneOnly = [member({ id: "p", vramMB: 900, kind: "phone" })];
+    expect(buildCatalog(phoneOnly).find((m) => m.id === "qwen25-7")?.unlocked).toBe(false);
+    const pick = pickRunnableModel("qwen25-7", phoneOnly);
+    expect(pick.model?.id).not.toBe("qwen25-7");
+    expect(pick.warning).toMatch(/no longer fits|Fell back/i);
+  });
 });
 

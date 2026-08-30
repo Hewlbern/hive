@@ -21,44 +21,36 @@ export function HiveRoom({ code }: { code: string }) {
     [hive.catalog],
   );
 
-  const canPrompt = unlockedLive.length > 0 && (hive.wallet?.balance ?? 0) + (hive.payFromPool ? hive.wallet?.poolBalance ?? 0 : 0) > 0;
+  const spendable =
+    (hive.wallet?.balance ?? 0) + (hive.payFromPool ? hive.wallet?.poolBalance ?? 0 : 0);
+  const canPrompt = unlockedLive.length > 0 && spendable > 0;
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col px-3 py-3 sm:px-5">
-      <header className="flex flex-wrap items-center gap-3 rounded-3xl border border-line bg-bg-elev/80 px-3 py-3 backdrop-blur sm:px-4">
-        <Link href="/" className="flex items-center gap-2 text-honey">
+    <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 py-4 sm:px-6" data-connected={hive.connected ? "true" : "false"}>
+      <header className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-2 text-ink">
           <HexMark className="h-5 w-5" />
           <span className="font-semibold">Hive</span>
         </Link>
-        <div className="font-mono text-sm tracking-[0.25em] text-ink">{hive.code}</div>
-        <p className="hidden text-sm text-muted md:block">
-          {hive.pool ? `${hive.pool.sharing} sharing · ${formatGB(hive.pool.pooledMB)} pooled` : "Connecting…"}
-        </p>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Switch
-            checked={hive.sharing}
-            onCheckedChange={hive.setSharing}
-            label={hive.sharing ? "I'm in — earning" : "Share compute"}
-          />
-          <button
-            type="button"
-            onClick={() => setWalletOpen(true)}
-            className="rounded-full border border-line px-3 py-2 font-mono text-sm hover:border-honey/50"
-          >
-            ₳{formatCredits(hive.wallet?.balance ?? 0)}
-            {hive.wallet?.testMode ? <span className="ml-2 text-[10px] text-honey">TEST</span> : null}
-          </button>
+        <div className="rounded-full bg-bg-elev px-3 py-1 font-semibold tracking-[0.2em]" data-testid="group-code">
+          {hive.code}
         </div>
+        <button
+          type="button"
+          data-testid="wallet-open"
+          onClick={() => setWalletOpen(true)}
+          className="ml-auto rounded-full bg-bg-elev px-4 py-2"
+        >
+          <span className="label block text-left">Balance</span>
+          <span className="text-lg font-semibold leading-none text-violet-soft" data-testid="balance">
+            {formatCredits(hive.wallet?.balance ?? 0)}
+            <span className="ml-1 text-xs font-medium text-muted">cr</span>
+          </span>
+        </button>
       </header>
 
-      {hive.probe ? (
-        <p className="mt-3 rounded-2xl border border-line px-3 py-2 text-xs text-muted">
-          Device fit: {hive.probe.kind} · {formatGB(hive.probe.vramMB)} estimated · {hive.probe.webgpu ? "WebGPU on" : "CPU kernel"} — {hive.probe.note}
-        </p>
-      ) : null}
-
       {hive.error ? (
-        <div className="mt-3 flex items-start justify-between gap-3 rounded-2xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+        <div className="mt-4 flex items-start justify-between gap-3 rounded-[24px] bg-danger/10 px-4 py-3 text-sm text-danger" data-testid="error-banner">
           <p>{hive.error}</p>
           <Button size="sm" variant="ghost" onClick={hive.clearError}>
             Dismiss
@@ -66,33 +58,76 @@ export function HiveRoom({ code }: { code: string }) {
         </div>
       ) : null}
 
-      <div className="mt-3 grid flex-1 gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-        <section className="hive-panel flex min-h-[420px] flex-col rounded-3xl p-3 sm:p-4">
+      <div className="mt-4 grid flex-1 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="flex flex-col gap-4">
+          <section className="sheet glow-violet p-6" data-testid="contributor-card">
+            <p className="label">Share compute</p>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <Switch
+                checked={hive.sharing}
+                onCheckedChange={hive.setSharing}
+                label={hive.sharing ? "You're in" : "I'm in"}
+              />
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <div>
+                <p className="label">Earned</p>
+                <p
+                  className="mt-1 text-4xl font-semibold tracking-tight"
+                  data-testid="earnings"
+                  data-earned={Math.max(hive.wallet?.sessionEarned ?? 0, hive.me?.earnedSession ?? 0)}
+                >
+                  {formatCredits(Math.max(hive.wallet?.sessionEarned ?? 0, hive.me?.earnedSession ?? 0))}
+                </p>
+              </div>
+              <div>
+                <p className="label">Pooled</p>
+                <p className="mt-1 text-4xl font-semibold tracking-tight" data-testid="pooled">
+                  {formatGB(hive.pool?.pooledMB ?? 0)}
+                </p>
+              </div>
+            </div>
+            <p className="mt-4 text-sm text-muted">
+              {hive.sharing
+                ? "Your memory is in the pool. You earn as tokens move."
+                : "Optional. Join is free — models unlock when someone shares."}
+            </p>
+          </section>
+
+          <Catalog
+            catalog={hive.catalog}
+            members={hive.members}
+            selectedId={hive.selectedModelId || hive.pool?.activeModelId || null}
+            onSelect={hive.selectModel}
+          />
+          <div className="hidden lg:block">
+            <Constellation members={hive.members} selfId={hive.selfId} />
+          </div>
+        </div>
+
+        <section className="sheet flex min-h-[420px] flex-col p-5 sm:p-6">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">Room</p>
-            {hive.status ? <p className="truncate text-xs text-honey">{hive.status}</p> : null}
+            <p className="label">Room</p>
+            {hive.status ? <p className="truncate text-sm text-violet-soft">{hive.status}</p> : null}
           </div>
 
-          <div className="mt-3 flex-1 space-y-3 overflow-auto pr-1">
+          <div className="mt-4 flex-1 space-y-3 overflow-auto pr-1" data-testid="token-stream">
             {hive.messages.length === 0 ? (
               <EmptyRoom sharing={hive.sharing} unlocked={unlockedLive.length} />
             ) : (
               hive.messages.map((m) => (
                 <article
                   key={m.id}
-                  className={`max-w-[42rem] rounded-2xl px-4 py-3 ${
-                    m.role === "you"
-                      ? "ml-auto bg-honey/10"
-                      : m.role === "system"
-                        ? "text-muted"
-                        : "bg-black/30"
+                  data-testid={m.role === "swarm" ? "swarm-message" : "user-message"}
+                  className={`max-w-[42rem] rounded-[22px] px-4 py-3 ${
+                    m.role === "you" ? "ml-auto bg-violet/15" : "bg-bg"
                   }`}
                 >
-                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+                  <p className="label">
                     {m.role === "you" ? m.authorName || "You" : m.role === "swarm" ? `Swarm · ${m.modelId}` : "Hive"}
                     {m.live ? " · live" : ""}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed">
+                  <p className="mt-2 text-[22px] leading-snug font-medium whitespace-pre-wrap" data-role={m.role}>
                     {m.text || (m.live ? "…" : "")}
                   </p>
                 </article>
@@ -101,61 +136,62 @@ export function HiveRoom({ code }: { code: string }) {
           </div>
 
           <form
-            className="mt-3 flex gap-2"
+            className="mt-4"
             onSubmit={(e) => {
               e.preventDefault();
               hive.sendPrompt(draft);
               setDraft("");
             }}
           >
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={
-                unlockedLive.length === 0
-                  ? "Catalog is locked — someone has to share compute"
-                  : "Prompt the swarm. Every screen sees the words."
-              }
-              rows={2}
-              className="flex-1 resize-none rounded-2xl px-4 py-3"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  hive.sendPrompt(draft);
-                  setDraft("");
-                }
-              }}
-            />
-            <div className="flex flex-col gap-2">
-              <Button type="submit" disabled={!canPrompt || hive.generating}>
-                Send
-              </Button>
-              {hive.generating ? (
-                <Button type="button" variant="danger" onClick={hive.abort}>
-                  Stop
-                </Button>
-              ) : null}
+            <label className="label" htmlFor="prompt">
+              Prompt
+            </label>
+            <div className="mt-2 flex items-end gap-2 border-b border-line pb-2">
+              <textarea
+                id="prompt"
+                data-testid="prompt-input"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={unlockedLive.length === 0 ? "Waiting for compute…" : "Ask the building"}
+                rows={2}
+                className="flex-1 resize-none border-0 bg-transparent text-2xl font-medium shadow-none focus:shadow-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    hive.sendPrompt(draft);
+                    setDraft("");
+                  }
+                }}
+              />
+              <span className="mb-2 shrink-0 text-sm text-muted">1 cr / tok</span>
             </div>
+            <Button
+              type="submit"
+              className="mt-4 w-full"
+              disabled={!canPrompt || hive.generating}
+              data-testid="prompt-send"
+            >
+              {hive.generating ? "Thinking…" : "Send"}
+            </Button>
+            {hive.generating ? (
+              <Button type="button" variant="danger" className="mt-2 w-full" onClick={hive.abort}>
+                Stop
+              </Button>
+            ) : null}
+            <label className="mt-3 flex items-center gap-2 text-sm text-muted">
+              <input
+                type="checkbox"
+                checked={hive.payFromPool}
+                onChange={(e) => hive.setPayFromPool(e.target.checked)}
+              />
+              Use the office pool if my wallet runs out
+            </label>
           </form>
-          <label className="mt-2 flex items-center gap-2 text-xs text-muted">
-            <input
-              type="checkbox"
-              checked={hive.payFromPool}
-              onChange={(e) => hive.setPayFromPool(e.target.checked)}
-            />
-            Spend from the office pool if my wallet runs out
-          </label>
         </section>
+      </div>
 
-        <aside className="flex flex-col gap-3">
-          <Constellation members={hive.members} selfId={hive.selfId} />
-          <Catalog
-            catalog={hive.catalog}
-            members={hive.members}
-            selectedId={hive.selectedModelId || hive.pool?.activeModelId || null}
-            onSelect={hive.selectModel}
-          />
-        </aside>
+      <div className="mt-4 lg:hidden">
+        <Constellation members={hive.members} selfId={hive.selfId} />
       </div>
 
       <WalletSheet
@@ -172,15 +208,14 @@ export function HiveRoom({ code }: { code: string }) {
 
 function EmptyRoom({ sharing, unlocked }: { sharing: boolean; unlocked: number }) {
   return (
-    <div className="flex flex-1 flex-col items-start justify-center px-2 py-10">
-      <p className="text-2xl font-semibold tracking-tight">Joining is the product.</p>
-      <p className="mt-3 max-w-md text-muted">
-        You are in the building. You do not have to share a GPU to sit here.
+    <div className="flex flex-1 flex-col justify-center py-8">
+      <p className="text-3xl font-semibold tracking-tight">You're in.</p>
+      <p className="mt-3 max-w-md text-[16px] leading-relaxed text-muted">
         {unlocked === 0
-          ? " The catalog is grey until someone taps Share compute — then models unlock live, no reload."
+          ? "The catalog stays locked until someone shares compute. Tap I'm in if this device can help."
           : sharing
-            ? " You are a contributor. Your memory is in the pool and you earn as tokens move."
-            : " Compute is already in the room. Type a prompt; contributors get paid per token."}
+            ? "You're a contributor. Earnings tick up as the room thinks."
+            : "Compute is in the room. Type a prompt — contributors get paid per token."}
       </p>
     </div>
   );
