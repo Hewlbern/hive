@@ -443,6 +443,19 @@ function sseResponse(body: unknown, extra: Record<string, string> = {}) {
   });
 }
 
+function publicOrigin(req: Request): string {
+  const url = new URL(req.url);
+  const host = req.headers.get("host");
+  if (host && !host.startsWith("0.0.0.0") && !host.startsWith("[::]")) {
+    return `${url.protocol}//${host}`;
+  }
+  if (process.env.HIVE_URL) return process.env.HIVE_URL.replace(/\/$/, "");
+  if (url.hostname === "0.0.0.0" || url.hostname === "::") {
+    url.hostname = "127.0.0.1";
+  }
+  return url.origin;
+}
+
 export async function handleMcpHttp(req: Request): Promise<Response> {
   const sessionId = req.headers.get("mcp-session-id") || crypto.randomUUID();
   const extra = { "Mcp-Session-Id": sessionId };
@@ -456,7 +469,7 @@ export async function handleMcpHttp(req: Request): Promise<Response> {
   }
 
   if (req.method === "GET") {
-    return jsonResponse(mcpServerCard(new URL(req.url).origin), 200, extra);
+    return jsonResponse(mcpServerCard(publicOrigin(req)), 200, extra);
   }
 
   if (req.method !== "POST") {

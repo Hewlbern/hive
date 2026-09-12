@@ -264,7 +264,7 @@ impl FriendStore {
         let mut row = existing;
         row.status = FriendshipStatus::Revoked;
         row.revoked_at = Some(now_ms());
-        self.state.friendships.insert(key, row.clone());
+        self.state.friendships.insert(key.clone(), row.clone());
         self.state.shares.retain(|_, s| pair_key(&s.from_id, &s.to_id) != key);
         self.persist()?;
         Ok(row)
