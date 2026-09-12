@@ -38,6 +38,7 @@ Never commit `.env`, `.env.local`, Stripe keys, LNbits keys, or TURN credentials
 | Layer assignment | `src/lib/assign.ts`, `src/lib/assign.test.ts` |
 | Credits | `src/lib/ledger.ts`, `src/server/ledger-store.ts` |
 | Signaling / presence | `src/server/hub.ts`, `src/app/api/signal/route.ts` |
+| Friends / MCP | `src/server/friends-store.ts`, `src/server/mcp.ts`, `docs/friends-mcp.md` |
 | Inference kernel | `src/lib/engine/` |
 | Room UI | `src/components/hive-room.tsx`, `catalog.tsx`, `constellation.tsx` |
 

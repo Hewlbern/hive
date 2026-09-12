@@ -146,6 +146,18 @@ cargo run -p hive-discord
 
 Pairing codes are **consume-once**, TTL 10 minutes, stored in `~/.config/hive/pairing.json` and/or the hub (`/api/pairing/*`).
 
+## Friends + Grok Bot / MCP
+
+Pods (Hive **device ids**) can mark each other as friends and then **opt into** sharing a note, fact, or context snippet. This is for Grok Bot and other MCP clients — not ambient mesh noise.
+
+- **Identity:** existing `deviceId` (web `hive.deviceId`, desktop `~/.config/hive/device_id`).
+- **Model:** request → accept (bidirectional) → revoke. Mutual request auto-accepts.
+- **Shares:** addressed payloads with optional `scope` (`note` / `fact` / `context`), `label`, and TTL. Default deny. No silent full-context dump.
+- **MCP:** Streamable HTTP at [`/api/mcp`](http://127.0.0.1:43177/api/mcp) (alias `/mcp`). Tools: `hive_whoami`, `hive_list_friends`, `hive_friend_request`, `hive_friend_accept`, `hive_friend_revoke`, `hive_share_with_friend`, `hive_pull_friend_shares`.
+- **Grok Bot:** add that URL as a custom remote MCP server; set header `X-Hive-Pod-Id` to this pod’s device id.
+
+Operator walkthrough (tool calls, curl, privacy): **[docs/friends-mcp.md](./docs/friends-mcp.md)**.
+
 ## How to join a group
 
 - **Start a building:** landing page → *Start a building swarm* (random four-letter code).
@@ -174,6 +186,8 @@ Copy `.env.example` to `.env.local`. **Never commit a real `.env`.**
 | `NEXT_PUBLIC_TURN_URL` | `turn:host:3478` (Metered, Twilio, or local coturn). |
 | `NEXT_PUBLIC_TURN_USERNAME` / `NEXT_PUBLIC_TURN_CREDENTIAL` | TURN auth. |
 | `HIVE_LEDGER_PATH` | Ledger JSON path. Default `data/ledger.json` (gitignored). |
+| `HIVE_FRIENDS_PATH` | Friend graph + shares JSON. Default `data/friends.json` (gitignored). |
+| `HIVE_POD_ID` | Default pod / device id for MCP when `X-Hive-Pod-Id` / tool `podId` is unset. |
 
 ```bash
 # optional local TURN
@@ -211,6 +225,7 @@ Unit / functional (always run in CI and on this VM):
 - Catalog unlock vs pooled VRAM, plus fallback when the pool shrinks
 - Ledger reserve, split-by-layers, unused release
 - Join / leave presence
+- Friend request / accept / revoke and opt-in shares (MCP tools)
 - Share-compute catalog updates
 - Prompt → token fan-out to every peer (fake kernel)
 - Demo wallet top-up
@@ -236,9 +251,13 @@ src/lib/ledger.ts          instant credit math
 src/lib/engine/            llama2.c-style kernel, tokenizer, WebLLM
 src/server/hub.ts          presence, assignment, settlement
 src/server/pairing-store.ts  Discord↔device pairing
+src/server/friends-store.ts  friend graph + opt-in shares (hub)
+src/server/mcp.ts            Streamable HTTP MCP tools for Grok Bot
+src/app/api/mcp              JSON-RPC endpoint (`/mcp` rewrite)
+docs/friends-mcp.md          operator guide
 src/app/api/signal         SSE + POST signaling
 src/components/hive-room   the group is the product
-crates/hive-core           guild map, pairing, catalog (Rust)
+crates/hive-core           guild map, pairing, friends, catalog (Rust)
 crates/hive-discord        slash commands + standalone binary
 src-tauri                  Tauri 2 desktop shell + tray
 desktop-ui                 tiny bootstrap page for packaged builds

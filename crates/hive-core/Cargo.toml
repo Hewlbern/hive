@@ -3,7 +3,7 @@ name = "hive-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Guild↔swarm mapping, pairing codes, catalog unlock for Hive"
+description = "Guild↔swarm mapping, pairing codes, friend store, catalog unlock for Hive"
 
 [dependencies]
 serde = { workspace = true }
