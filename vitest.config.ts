@@ -7,6 +7,7 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     env: {
       HIVE_LEDGER_PATH: path.resolve(__dirname, "data/ledger.test.json"),
+      HIVE_FRIENDS_PATH: path.resolve(__dirname, "data/friends.test.json"),
     },
   },
   resolve: {
